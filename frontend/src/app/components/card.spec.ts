@@ -29,14 +29,16 @@ describe('CardComponent', () => {
 
   it('should emit clicked event when clickable and clicked', () => {
     spyOn(component.clicked, 'emit');
-    component.clickable.set(true);
+    fixture.componentRef.setInput('clickable', true);
+    fixture.detectChanges();
     component.onCardClick();
     expect(component.clicked.emit).toHaveBeenCalled();
   });
 
   it('should not emit clicked event when not clickable', () => {
     spyOn(component.clicked, 'emit');
-    component.clickable.set(false);
+    fixture.componentRef.setInput('clickable', false);
+    fixture.detectChanges();
     component.onCardClick();
     expect(component.clicked.emit).not.toHaveBeenCalled();
   });
@@ -46,7 +48,8 @@ describe('CardComponent', () => {
   });
 
   it('should accept title input', () => {
-    component.title.set('Test Title');
+    fixture.componentRef.setInput('title', 'Test Title');
+    fixture.detectChanges();
     expect(component.title()).toBe('Test Title');
   });
 
@@ -55,7 +58,8 @@ describe('CardComponent', () => {
   });
 
   it('should accept subtitle input', () => {
-    component.subtitle.set('Test Subtitle');
+    fixture.componentRef.setInput('subtitle', 'Test Subtitle');
+    fixture.detectChanges();
     expect(component.subtitle()).toBe('Test Subtitle');
   });
 });
