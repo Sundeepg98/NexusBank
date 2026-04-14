@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth-guard';
 import { loginGuard } from './guards/login-guard';
+import { accountsResolver } from './guards/accounts-resolver';
 
 export const routes: Routes = [
   {
@@ -37,7 +38,10 @@ export const routes: Routes = [
   {
     path: 'netbanking',
     loadComponent: () => import('./pages/netbanking/netbanking').then(m => m.Netbanking),
-    canActivate: [authGuard]
+    canActivate: [authGuard],
+    resolve: {
+      accounts: accountsResolver
+    }
   },
   {
     path: '**',

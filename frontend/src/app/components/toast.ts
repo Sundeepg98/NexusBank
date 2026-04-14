@@ -1,13 +1,14 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-toast',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (show()) {
-      <div class="toast" [class]="type()">
+      <div class="toast" [class]="type()" [@slideIn]>
         <span class="message">{{ message() }}</span>
         <button class="close" (click)="onClose()">&times;</button>
       </div>
@@ -25,13 +26,7 @@ import { CommonModule } from '@angular/common';
       gap: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 9999;
-      animation: slideIn 0.3s ease;
       max-width: 400px;
-    }
-    
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
     }
     
     .toast.success {

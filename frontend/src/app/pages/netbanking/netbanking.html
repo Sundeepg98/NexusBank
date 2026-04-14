@@ -6,45 +6,52 @@
     </header>
     
     <div class="dashboard-grid">
-      <div 
-        class="dashboard-card" 
+      <app-card 
+        [clickable]="true"
+        (clicked)="viewAccounts()"
+        class="dashboard-card"
         [class.active]="showAccounts()"
-        (click)="viewAccounts()"
       >
-        <div class="card-icon">🏦</div>
+        <span class="card-icon">🏦</span>
         <h3>My Accounts</h3>
         <p>View your account details and balances</p>
-      </div>
+      </app-card>
       
-      <div 
-        class="dashboard-card" 
+      <app-card 
+        [clickable]="true"
+        (clicked)="transferFunds()"
+        class="dashboard-card"
         [class.active]="showTransfer()"
-        (click)="transferFunds()"
       >
-        <div class="card-icon">💸</div>
+        <span class="card-icon">💸</span>
         <h3>Fund Transfer</h3>
         <p>Transfer money to other accounts</p>
-      </div>
+      </app-card>
       
-      <div 
-        class="dashboard-card" 
+      <app-card 
+        [clickable]="true"
+        (clicked)="viewTransactions()"
+        class="dashboard-card"
         [class.active]="showTransactions()"
-        (click)="viewTransactions()"
       >
-        <div class="card-icon">📊</div>
+        <span class="card-icon">📊</span>
         <h3>Transactions</h3>
         <p>View your transaction history</p>
-      </div>
+      </app-card>
       
-      <div class="dashboard-card" (click)="profile()">
-        <div class="card-icon">👤</div>
+      <app-card 
+        [clickable]="true"
+        (clicked)="profile()"
+        class="dashboard-card"
+      >
+        <span class="card-icon">👤</span>
         <h3>Profile</h3>
         <p>Manage your account settings</p>
-      </div>
+      </app-card>
     </div>
     
     @if (showAccounts()) {
-      <div class="section">
+      <div class="section" @fadeIn>
         <h2>Your Accounts</h2>
         
         @if (loadState() === 'loading') {
@@ -55,27 +62,29 @@
             <button class="btn-small" (click)="loadAccounts()">Retry</button>
           </div>
         } @else {
-          @for (account of accounts(); track account.id) {
-            <div 
-              class="account-card"
-              [class.selected]="selectedAccount()?.id === account.id"
-              (click)="selectAccount(account)"
-            >
-              <div class="account-header">
-                <span class="account-type">{{ account.accountType }}</span>
-                @if (selectedAccount()?.id === account.id) {
-                  <span class="selected-badge">Selected</span>
-                }
+          <div #accountList class="account-list">
+            @for (account of accounts(); track account.id) {
+              <div 
+                class="account-card"
+                [class.selected]="selectedAccount()?.id === account.id"
+                (click)="selectAccount(account)"
+              >
+                <div class="account-header">
+                  <span class="account-type">{{ account.accountType }}</span>
+                  @if (selectedAccount()?.id === account.id) {
+                    <span class="selected-badge">Selected</span>
+                  }
+                </div>
+                <div class="account-number">{{ account.accountNumber }}</div>
+                <div class="account-balance">
+                  <span class="label">Balance:</span>
+                  <span class="value">{{ formatCurrency(account.balance) }}</span>
+                </div>
               </div>
-              <div class="account-number">{{ account.accountNumber }}</div>
-              <div class="account-balance">
-                <span class="label">Balance:</span>
-                <span class="value">{{ formatCurrency(account.balance) }}</span>
-              </div>
-            </div>
-          } @empty {
-            <p class="empty-state">No accounts found</p>
-          }
+            } @empty {
+              <p class="empty-state">No accounts found</p>
+            }
+          </div>
         }
         
         <button class="btn btn-secondary mt-2" (click)="openCreateAccount()">

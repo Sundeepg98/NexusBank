@@ -1,22 +1,50 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
+import { trigger, state, style, transition, animate } from '@angular/animations';
 import { Subject, takeUntil } from 'rxjs';
 import { ApiService } from '../../services/api';
 import { AuthService } from '../../services/auth';
 import { Account, Transaction, LoadingState } from '../../models';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
+import { CardComponent } from '../../components/card';
 
 @Component({
   selector: 'app-netbanking',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent],
+  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent, CardComponent],
   templateUrl: './netbanking.html',
-  styleUrl: './netbanking.scss'
+  styleUrl: './netbanking.scss',
+  animations: [
+    trigger('fadeIn', [
+      state('void', style({ opacity: 0, transform: 'translateY(-10px)' })),
+      state('*', style({ opacity: 1, transform: 'translateY(0)' })),
+      transition(':enter', [
+        animate('300ms ease-out')
+      ]),
+      transition(':leave', [
+        animate('200ms ease-in', style({ opacity: 0 }))
+      ])
+    ]),
+    trigger('slideIn', [
+      transition(':enter', [
+        style({ transform: 'translateX(100%)', opacity: 0 }),
+        animate('300ms ease-out', style({ transform: 'translateX(0)', opacity: 1 }))
+      ]),
+      transition(':leave', [
+        animate('200ms ease-in', style({ transform: 'translateX(100%)', opacity: 0 }))
+      ])
+    ])
+  ]
 })
-export class Netbanking implements OnInit, OnDestroy {
+export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('accountList') accountList!: ElementRef<HTMLDivElement>;
+  
+  // Example of @ViewChild usage - accessing child component
+  @ViewChild(CardComponent) cardComponent!: CardComponent;
+  
   private destroy$ = new Subject<void>();
 
   // State signals
@@ -53,13 +81,28 @@ export class Netbanking implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private apiService: ApiService,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.initTransferForm();
   }
 
+  ngAfterViewInit(): void {
+    console.log('Account list element:', this.accountList);
+  }
+
   ngOnInit(): void {
-    this.loadAccounts();
+    const resolvedAccounts = this.route.snapshot.data['accounts'];
+    if (resolvedAccounts && resolvedAccounts.length > 0) {
+      this.accounts.set(resolvedAccounts);
+      this.selectedAccount.set(resolvedAccounts[0]);
+      this.loadState.set('success');
+      if (resolvedAccounts.length > 0) {
+        this.transferForm.patchValue({ fromAccountId: resolvedAccounts[0].id });
+      }
+    } else {
+      this.loadAccounts();
+    }
   }
 
   ngOnDestroy(): void {
