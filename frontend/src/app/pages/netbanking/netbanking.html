@@ -77,6 +77,84 @@
             <p class="empty-state">No accounts found</p>
           }
         }
+        
+        <button class="btn btn-secondary mt-2" (click)="openCreateAccount()">
+          + Create New Account
+        </button>
+      </div>
+    }
+    
+    @if (showCreateAccount()) {
+      <div class="section create-account-form">
+        <h2>Create New Account</h2>
+        
+        <div class="form-group">
+          <label>Account Type</label>
+          <div class="account-type-options">
+            <button 
+              type="button"
+              class="type-option"
+              [class.selected]="selectedAccountType() === 'SAVINGS'"
+              (click)="selectedAccountType.set('SAVINGS')"
+            >
+              <span class="type-icon">🐷</span>
+              <span class="type-name">Savings</span>
+              <span class="type-desc">Earn interest on your deposits</span>
+            </button>
+            
+            <button 
+              type="button"
+              class="type-option"
+              [class.selected]="selectedAccountType() === 'CURRENT'"
+              (click)="selectedAccountType.set('CURRENT')"
+            >
+              <span class="type-icon">💼</span>
+              <span class="type-name">Current</span>
+              <span class="type-desc">For business transactions</span>
+            </button>
+            
+            <button 
+              type="button"
+              class="type-option"
+              [class.selected]="selectedAccountType() === 'FIXED'"
+              (click)="selectedAccountType.set('FIXED')"
+            >
+              <span class="type-icon">🔒</span>
+              <span class="type-name">Fixed</span>
+              <span class="type-desc">Locked deposits with higher returns</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="initialDeposit">Initial Deposit (USD)</label>
+          <input 
+            id="initialDeposit"
+            type="number" 
+            [value]="initialDeposit()"
+            (input)="initialDeposit.set(+$any($event.target).value)"
+            min="0"
+            placeholder="Enter initial deposit amount"
+          >
+          <span class="helper-text">Leave as 0 for no initial deposit</span>
+        </div>
+        
+        <div class="form-actions">
+          <button 
+            class="btn btn-primary"
+            [disabled]="creatingAccount()"
+            (click)="createAccount()"
+          >
+            {{ creatingAccount() ? 'Creating...' : 'Create Account' }}
+          </button>
+          
+          <button 
+            class="btn btn-secondary"
+            (click)="closeCreateAccount()"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     }
     
@@ -180,7 +258,7 @@
         } @else {
           <div class="transactions-list">
             @for (txn of transactions(); track txn.id) {
-              <div class="transaction-item">
+              <div class="transaction-item" (click)="viewTransactionDetail(txn)">
                 <div class="transaction-info">
                   <span class="transaction-desc">{{ txn.description }}</span>
                   <span class="transaction-date">{{ formatDate(txn.timestamp) }}</span>
@@ -192,6 +270,41 @@
             } @empty {
               <p class="empty-state">No transactions found</p>
             }
+          </div>
+        }
+        
+        @if (selectedTransaction()) {
+          <div class="transaction-detail-overlay" (click)="closeTransactionDetail()">
+            <div class="transaction-detail-modal" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <h3>Transaction Details</h3>
+                <button class="close-btn" (click)="closeTransactionDetail()">×</button>
+              </div>
+              <div class="modal-body">
+                <div class="detail-row">
+                  <span class="detail-label">Transaction ID</span>
+                  <span class="detail-value mono">{{ selectedTransaction()!.id }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Description</span>
+                  <span class="detail-value">{{ selectedTransaction()!.description }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Amount</span>
+                  <span class="detail-value" [class.credit]="selectedTransaction()!.amount > 0" [class.debit]="selectedTransaction()!.amount < 0">
+                    {{ selectedTransaction()!.amount > 0 ? '+' : '' }}{{ formatCurrency(selectedTransaction()!.amount) }}
+                  </span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Date & Time</span>
+                  <span class="detail-value">{{ formatDate(selectedTransaction()!.timestamp) }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Status</span>
+                  <span class="detail-value status-badge success">Completed</span>
+                </div>
+              </div>
+            </div>
           </div>
         }
       </div>
@@ -211,6 +324,6 @@
 />
 
 <app-loading 
-  [show]="loadState() === 'loading' || transferState() === 'loading'" 
-  [message]="transferState() === 'loading' ? 'Processing transfer...' : ''" 
+  [show]="loadState() === 'loading' || transferState() === 'loading' || creatingAccount()" 
+  [message]="creatingAccount() ? 'Creating account...' : (transferState() === 'loading' ? 'Processing transfer...' : '')" 
 />

@@ -29,13 +29,18 @@ export class Netbanking implements OnInit, OnDestroy {
   showAccounts = signal(false);
   showTransfer = signal(false);
   showTransactions = signal(false);
+  showCreateAccount = signal(false);
   toastMessage = signal('');
   toastType = signal<'success' | 'error' | 'warning'>('success');
   showToast = signal(false);
+  creatingAccount = signal(false);
+  selectedAccountType = signal<'SAVINGS' | 'CURRENT' | 'FIXED'>('SAVINGS');
+  initialDeposit = signal<number>(0);
 
   // Forms
   transferForm!: FormGroup;
   selectedAccount = signal<Account | null>(null);
+  selectedTransaction = signal<Transaction | null>(null);
 
   // User info
   user = computed(() => this.authService.user());
@@ -95,6 +100,36 @@ export class Netbanking implements OnInit, OnDestroy {
     this.showAccounts.set(!this.showAccounts());
     this.showTransfer.set(false);
     this.showTransactions.set(false);
+    this.showCreateAccount.set(false);
+  }
+
+  openCreateAccount(): void {
+    this.showCreateAccount.set(true);
+    this.showAccounts.set(false);
+    this.showTransfer.set(false);
+    this.showTransactions.set(false);
+  }
+
+  closeCreateAccount(): void {
+    this.showCreateAccount.set(false);
+  }
+
+  createAccount(): void {
+    this.creatingAccount.set(true);
+    this.apiService.createAccount(this.selectedAccountType(), this.initialDeposit())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.creatingAccount.set(false);
+          this.showToastMessage(response.message, 'success');
+          this.showCreateAccount.set(false);
+          this.loadAccounts();
+        },
+        error: (err: Error) => {
+          this.creatingAccount.set(false);
+          this.showToastMessage(err.message || 'Failed to create account', 'error');
+        },
+      });
   }
 
   transferFunds(): void {
@@ -210,5 +245,13 @@ export class Netbanking implements OnInit, OnDestroy {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  viewTransactionDetail(txn: Transaction): void {
+    this.selectedTransaction.set(txn);
+  }
+
+  closeTransactionDetail(): void {
+    this.selectedTransaction.set(null);
   }
 }

@@ -84,6 +84,16 @@ export class ApiService {
       );
   }
 
+  createAccount(accountType: string, initialDeposit?: number): Observable<{ message: string; account: Account }> {
+    return this.http
+      .post<{ message: string; account: Account }>(
+        `${this.baseUrl}/accounts`,
+        { accountType, initialDeposit: initialDeposit || 0 },
+        { headers: this.getHeaders() }
+      )
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
   getAccountBalance(accountId: string): Observable<{ balance: number }> {
     return this.http
       .get<{ balance: number }>(`${this.baseUrl}/accounts/${accountId}/balance`, {

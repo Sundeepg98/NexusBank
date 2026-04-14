@@ -1,0 +1,168 @@
+<section class="page">
+  <div class="register-container">
+    <div class="register-card">
+      <div class="card-header">
+        <h1>Create Account</h1>
+        <p>Join NexusBank and start managing your finances</p>
+      </div>
+      
+      <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName">First Name</label>
+            <input 
+              id="firstName"
+              type="text" 
+              formControlName="firstName" 
+              placeholder="John"
+              [class.is-invalid]="hasError('firstName', 'required') || hasError('firstName', 'minlength')"
+            >
+            @if (hasError('firstName', 'required')) {
+              <span class="error-message">First name is required</span>
+            }
+            @if (hasError('firstName', 'minlength')) {
+              <span class="error-message">At least 2 characters</span>
+            }
+          </div>
+          
+          <div class="form-group">
+            <label for="lastName">Last Name</label>
+            <input 
+              id="lastName"
+              type="text" 
+              formControlName="lastName" 
+              placeholder="Doe"
+              [class.is-invalid]="hasError('lastName', 'required') || hasError('lastName', 'minlength')"
+            >
+            @if (hasError('lastName', 'required')) {
+              <span class="error-message">Last name is required</span>
+            }
+            @if (hasError('lastName', 'minlength')) {
+              <span class="error-message">At least 2 characters</span>
+            }
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input 
+            id="email"
+            type="email" 
+            formControlName="email" 
+            placeholder="john@example.com"
+            [class.is-invalid]="hasError('email', 'required') || hasError('email', 'email')"
+          >
+          @if (hasError('email', 'required')) {
+            <span class="error-message">Email is required</span>
+          }
+          @if (hasError('email', 'email')) {
+            <span class="error-message">Please enter a valid email</span>
+          }
+        </div>
+        
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input 
+            id="username"
+            type="text" 
+            formControlName="username" 
+            placeholder="johndoe123"
+            [class.is-invalid]="hasError('username', 'required') || hasError('username', 'minlength')"
+          >
+          @if (hasError('username', 'required')) {
+            <span class="error-message">Username is required</span>
+          }
+          @if (hasError('username', 'minlength')) {
+            <span class="error-message">At least 3 characters</span>
+          }
+        </div>
+        
+        <div class="form-group">
+          <label for="phone">Phone (Optional)</label>
+          <input 
+            id="phone"
+            type="tel" 
+            formControlName="phone" 
+            placeholder="+1 234 567 8900"
+            [class.is-invalid]="hasError('phone', 'pattern')"
+          >
+          @if (hasError('phone', 'pattern')) {
+            <span class="error-message">Please enter a valid phone number</span>
+          }
+        </div>
+        
+        <div class="form-group password-group">
+          <label for="password">Password</label>
+          <div class="password-input">
+            <input 
+              id="password"
+              [type]="showPassword() ? 'text' : 'password'" 
+              formControlName="password" 
+              placeholder="Create a strong password"
+              [class.is-invalid]="hasError('password', 'required') || hasError('password', 'minlength') || hasError('password', 'pattern')"
+            >
+            <button type="button" class="toggle-password" (click)="togglePassword()">
+              {{ showPassword() ? '🙈' : '👁️' }}
+            </button>
+          </div>
+          @if (hasError('password', 'required')) {
+            <span class="error-message">Password is required</span>
+          }
+          @if (hasError('password', 'minlength')) {
+            <span class="error-message">At least 8 characters</span>
+          }
+          @if (hasError('password', 'pattern')) {
+            <span class="error-message">Must contain uppercase, lowercase, and number</span>
+          }
+          <div class="password-strength">
+            <div class="strength-bar">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </div>
+            <span class="strength-text">Use uppercase, lowercase, and numbers</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input 
+            id="confirmPassword"
+            type="password" 
+            formControlName="confirmPassword" 
+            placeholder="Confirm your password"
+            [class.is-invalid]="hasError('confirmPassword', 'required') || registerForm.hasError('passwordMismatch')"
+          >
+          @if (hasError('confirmPassword', 'required')) {
+            <span class="error-message">Please confirm your password</span>
+          }
+          @if (registerForm.hasError('passwordMismatch')) {
+            <span class="error-message">Passwords do not match</span>
+          }
+        </div>
+        
+        <button 
+          type="submit" 
+          class="btn btn-primary"
+          [disabled]="registerForm.invalid || isLoading()"
+        >
+          {{ isLoading() ? 'Creating Account...' : 'Create Account' }}
+        </button>
+        
+        <div class="login-link">
+          Already have an account? <a routerLink="/welcome">Login here</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<app-toast 
+  [show]="showToast()" 
+  [message]="toastMessage()" 
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>
+
+<app-loading [show]="isLoading()" message="Creating your account..." />

@@ -168,6 +168,52 @@ app.get('/api/accounts', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/accounts', authMiddleware, async (req, res) => {
+  try {
+    const { accountType, initialDeposit } = req.body;
+
+    if (!['SAVINGS', 'CURRENT', 'FIXED'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type' });
+    }
+
+    const deposit = initialDeposit && initialDeposit >= 0 ? initialDeposit : 0;
+
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})
+         CREATE (a:Account {
+           id: randomUUID(),
+           accountNumber: substring(randomUUID(), 0, 12),
+           accountType: $accountType,
+           balance: $initialDeposit,
+           createdAt: datetime()
+         })
+         CREATE (u)-[:HAS_ACCOUNT]->(a)
+         RETURN a`,
+        { userId: req.user.userId, accountType, initialDeposit: deposit }
+      )
+    );
+
+    if (result.records.length === 0) {
+      return res.status(500).json({ error: 'Failed to create account' });
+    }
+
+    const account = result.records[0].get('a').properties;
+    res.status(201).json({
+      message: 'Account created successfully',
+      account: {
+        id: account.id,
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        balance: neo4j.isInt(account.balance) ? account.balance.toNumber() : account.balance
+      }
+    });
+  } catch (error) {
+    console.error('Create account error:', error);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
 app.post('/api/transactions/transfer', authMiddleware, async (req, res) => {
   try {
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
