@@ -22,7 +22,7 @@ test.describe('Netbanking Dashboard', () => {
   });
 
   test('should show transfer form', async ({ page }) => {
-    await page.click('text=Fund Transfer');
+    await page.click('h3:has-text("Fund Transfer")');
     await expect(page.locator('text=Single Transfer')).toBeVisible();
   });
 

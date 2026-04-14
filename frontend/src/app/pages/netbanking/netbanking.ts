@@ -389,12 +389,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   }
 
   profile(): void {
-    const u = this.user();
-    this.showToastMessage(`Profile: ${u?.email || 'Not available'}`, 'success');
+    this.router.navigate(['/profile']);
   }
 
   logout(): void {
     this.authService.logout();
+    this.router.navigate(['/welcome']);
   }
 
   private showToastMessage(message: string, type: 'success' | 'error' | 'warning'): void {
