@@ -52,7 +52,7 @@ export class ApiService {
 
   getProfile(): Observable<{ user: User; accounts: Account[] }> {
     return this.http
-      .get<{ user: User; accounts: Account[] }>(`${this.baseUrl}/auth/profile`)
+      .get<{ user: User; accounts: Account[] }>(`${this.baseUrl}/profile`)
       .pipe(catchError((err) => this.handleError(err)));
   }
 

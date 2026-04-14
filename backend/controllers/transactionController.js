@@ -20,33 +20,42 @@ const generateOTP = () => {
 const getTransactions = async (req, res) => {
   try {
     const { accountId, page = 1, limit = 20 } = req.query;
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    
+    if (!accountId) {
+      return res.status(400).json({ error: 'accountId is required' });
+    }
+    
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
     const skip = (pageNum - 1) * limitNum;
 
-    const countResult = await withSession(session =>
+    const txResult = await withSession(session =>
       session.run(
         `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
-         RETURN count(t) as total`,
+         WITH t ORDER BY t.timestamp DESC
+         WITH collect(t) as txns, count(t) as total
+         RETURN txns, total`,
         { accountId }
       )
     );
-    const total = countResult.records[0]?.get('total')?.toNumber() || 0;
+    
+    let total = 0;
+    let txns = [];
+    if (txResult.records.length > 0) {
+      const record = txResult.records[0];
+      const totalVal = record.get('total');
+      total = neo4j.isInt(totalVal) ? totalVal.toNumber() : (totalVal || 0);
+      txns = record.get('txns') || [];
+    }
 
-    const result = await withSession(session =>
-      session.run(
-        `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
-         RETURN t ORDER BY t.timestamp DESC SKIP $skip LIMIT $limitNum`,
-        { accountId, skip, limitNum }
-      )
-    );
-
-    const transactions = result.records.map(r => {
-      const props = r.get('t').properties;
+    const paginatedTxns = txns.slice(skip, skip + limitNum);
+    
+    const transactions = paginatedTxns.map(t => {
+      const props = t.properties;
       let timestamp = props.timestamp;
       if (timestamp && typeof timestamp === 'object') {
-        const t = timestamp;
-        timestamp = `${t.year.low || t.year}-${String(t.month.low || t.month).padStart(2, '0')}-${String(t.day.low || t.day).padStart(2, '0')}T${String(t.hour.low || t.hour || 0).padStart(2, '0')}:${String(t.minute.low || t.minute || 0).padStart(2, '0')}:${String(t.second.low || t.second || 0).padStart(2, '0')}.${String(t.nanosecond ? t.nanosecond.low || t.nanosecond : 0).padStart(9, '0')}${t.timezone && t.timezone.id ? t.timezone.id.replace('UTC', '+00:00') : '+00:00'}`;
+        const tm = timestamp;
+        timestamp = `${tm.year.low || tm.year}-${String(tm.month.low || tm.month).padStart(2, '0')}-${String(tm.day.low || tm.day).padStart(2, '0')}T${String(tm.hour.low || tm.hour || 0).padStart(2, '0')}:${String(tm.minute.low || tm.minute || 0).padStart(2, '0')}:${String(tm.second.low || tm.second || 0).padStart(2, '0')}`;
       }
       return {
         id: props.id,
