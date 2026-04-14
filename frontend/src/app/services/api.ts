@@ -96,4 +96,10 @@ export class ApiService {
       .post<{ message: string }>(`${this.baseUrl}/transactions/transfer`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
+
+  changePassword(data: { currentPassword: string; newPassword: string }): Observable<{ message: string }> {
+    return this.http
+      .post<{ message: string }>(`${this.baseUrl}/auth/change-password`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
 }

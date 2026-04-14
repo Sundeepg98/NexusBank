@@ -27,9 +27,12 @@ const withSession = async (callback) => {
   }
 };
 
+const blacklistedTokens = new Set();
+
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
+  if (blacklistedTokens.has(token)) return res.status(401).json({ error: 'Token has been revoked' });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
@@ -51,20 +54,20 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const userResult = await withSession(session =>
+const userResult = await withSession(session =>
       session.run(
         `CREATE (u:User {
           id: randomUUID(),
           username: $username,
           email: $email,
-          password: $password,
+          password: $hashedPassword,
           firstName: $firstName,
           lastName: $lastName,
           phone: $phone,
           createdAt: datetime()
         })
         RETURN u`,
-        { username, email, password: hashedPassword, firstName, lastName, phone }
+        { username, email, hashedPassword, firstName, lastName, phone }
       )
     );
 
@@ -303,10 +306,215 @@ app.get('/api/transactions', authMiddleware, async (req, res) => {
         timestamp
       };
     });
-    res.json({ transactions });
+res.json({ transactions });
   } catch (error) {
     console.error('Get transactions error:', error);
     res.status(500).json({ error: 'Failed to get transactions' });
+  }
+});
+
+app.post('/api/auth/logout', authMiddleware, (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  blacklistedTokens.add(token);
+  res.json({ message: 'Logged out successfully' });
+});
+
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
+    }
+
+    const result = await withSession(session =>
+      session.run('MATCH (u:User {id: $userId}) RETURN u', { userId: req.user.userId })
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.records[0].get('u').properties;
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await withSession(session =>
+      session.run('MATCH (u:User {id: $userId}) SET u.password = $newPassword', { userId: req.user.userId, newPassword: hashedNewPassword })
+    );
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+app.get('/api/profile', authMiddleware, async (req, res) => {
+  try {
+    const result = await withSession(session =>
+      session.run('MATCH (u:User {id: $userId}) RETURN u', { userId: req.user.userId })
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.records[0].get('u').properties;
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        createdAt: user.createdAt ? user.createdAt.toString() : null
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Failed to get profile' });
+  }
+});
+
+app.put('/api/profile', authMiddleware, async (req, res) => {
+  try {
+    const { firstName, lastName, phone } = req.body;
+
+    const result = await withSession(session =>
+      session.run(
+        'MATCH (u:User {id: $userId}) SET u.firstName = $firstName, u.lastName = $lastName, u.phone = $phone RETURN u',
+        { userId: req.user.userId, firstName, lastName, phone }
+      )
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.records[0].get('u').properties;
+    res.json({
+      message: 'Profile updated',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        createdAt: user.createdAt ? user.createdAt.toString() : null
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+app.get('/api/beneficiaries', authMiddleware, async (req, res) => {
+  try {
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})-[:HAS_BENEFICIARY]->(b:Beneficiary)
+         RETURN b ORDER BY b.createdAt DESC`,
+        { userId: req.user.userId }
+      )
+    );
+
+    const beneficiaries = result.records.map(r => {
+      const props = r.get('b').properties;
+      return {
+        id: props.id,
+        accountNumber: props.accountNumber,
+        nickname: props.nickname,
+        bankName: props.bankName,
+        createdAt: props.createdAt ? props.createdAt.toString() : null
+      };
+    });
+
+    res.json({ beneficiaries });
+  } catch (error) {
+    console.error('Get beneficiaries error:', error);
+    res.status(500).json({ error: 'Failed to get beneficiaries' });
+  }
+});
+
+app.post('/api/beneficiaries', authMiddleware, async (req, res) => {
+  try {
+    const { accountNumber, nickname, bankName } = req.body;
+
+    if (!accountNumber || !nickname || !bankName) {
+      return res.status(400).json({ error: 'accountNumber, nickname, and bankName are required' });
+    }
+
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})
+         CREATE (b:Beneficiary {
+           id: randomUUID(),
+           accountNumber: $accountNumber,
+           nickname: $nickname,
+           bankName: $bankName,
+           createdAt: datetime()
+         })
+         CREATE (u)-[:HAS_BENEFICIARY]->(b)
+         RETURN b`,
+        { userId: req.user.userId, accountNumber, nickname, bankName }
+      )
+    );
+
+    if (result.records.length === 0) {
+      return res.status(500).json({ error: 'Failed to add beneficiary' });
+    }
+
+    const beneficiary = result.records[0].get('b').properties;
+    res.status(201).json({
+      message: 'Beneficiary added',
+      beneficiary: {
+        id: beneficiary.id,
+        accountNumber: beneficiary.accountNumber,
+        nickname: beneficiary.nickname,
+        bankName: beneficiary.bankName,
+        createdAt: beneficiary.createdAt ? beneficiary.createdAt.toString() : null
+      }
+    });
+  } catch (error) {
+    console.error('Add beneficiary error:', error);
+    res.status(500).json({ error: 'Failed to add beneficiary' });
+  }
+});
+
+app.delete('/api/beneficiaries/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})-[:HAS_BENEFICIARY]->(b:Beneficiary {id: $id})
+         DETACH DELETE b`,
+        { userId: req.user.userId, id }
+      )
+    );
+
+    res.json({ message: 'Beneficiary removed' });
+  } catch (error) {
+    console.error('Delete beneficiary error:', error);
+    res.status(500).json({ error: 'Failed to remove beneficiary' });
   }
 });
 

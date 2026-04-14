@@ -1,0 +1,145 @@
+<app-toast
+  [message]="toastMessage()"
+  [type]="toastType()"
+  [show]="showToast()"
+  (closed)="closeToast()"
+/>
+
+<app-loading [show]="loadState() === 'loading'" />
+
+<div class="profile-container">
+  @if (loadState() === 'error') {
+    <div class="error-message">
+      <p>Failed to load profile. Please try again.</p>
+      <button class="btn btn-primary" (click)="loadProfile()">Retry</button>
+    </div>
+  } @else if (user(); as userData) {
+    <div class="profile-header">
+      <h1>Welcome, {{ userName() }}</h1>
+      <button class="btn btn-secondary" (click)="logout()">Logout</button>
+    </div>
+
+    <div class="profile-content">
+      <div class="card">
+        <h2>Profile Information</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>Username</label>
+            <span>{{ userData.username }}</span>
+          </div>
+          <div class="info-item">
+            <label>Email</label>
+            <span>{{ userData.email }}</span>
+          </div>
+          <div class="info-item">
+            <label>First Name</label>
+            <span>{{ userData.firstName }}</span>
+          </div>
+          <div class="info-item">
+            <label>Last Name</label>
+            <span>{{ userData.lastName }}</span>
+          </div>
+          <div class="info-item">
+            <label>Phone</label>
+            <span>{{ userData.phone || 'N/A' }}</span>
+          </div>
+          <div class="info-item">
+            <label>Member Since</label>
+            <span>{{ userData.createdAt | dateFormat:'long' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Security</h2>
+          @if (!showPasswordForm()) {
+            <button class="btn btn-primary" (click)="togglePasswordForm()">
+              Change Password
+            </button>
+          }
+        </div>
+
+        @if (showPasswordForm()) {
+          <form [formGroup]="passwordForm" (ngSubmit)="onChangePassword()" class="password-form">
+            <div class="form-group">
+              <label for="currentPassword">Current Password</label>
+              <input
+                type="password"
+                id="currentPassword"
+                formControlName="currentPassword"
+                placeholder="Enter current password"
+              />
+              @if (hasError('currentPassword', 'required')) {
+                <span class="error">Current password is required</span>
+              }
+              @if (hasError('currentPassword', 'minlength')) {
+                <span class="error">Password must be at least 8 characters</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <input
+                type="password"
+                id="newPassword"
+                formControlName="newPassword"
+                placeholder="Enter new password"
+              />
+              @if (hasError('newPassword', 'required')) {
+                <span class="error">New password is required</span>
+              }
+              @if (hasError('newPassword', 'minlength')) {
+                <span class="error">Password must be at least 8 characters</span>
+              }
+              @if (hasError('newPassword', 'pattern')) {
+                <span class="error">Must contain uppercase, lowercase, number, and special character</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="confirmPassword">Confirm Password</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                formControlName="confirmPassword"
+                placeholder="Confirm new password"
+              />
+              @if (hasError('confirmPassword', 'required')) {
+                <span class="error">Please confirm your password</span>
+              }
+              @if (passwordForm.errors?.['passwordMismatch']) {
+                <span class="error">Passwords do not match</span>
+              }
+            </div>
+
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                [disabled]="changePasswordState() === 'loading'"
+              >
+                @if (changePasswordState() === 'loading') {
+                  <span class="spinner"></span> Changing...
+                } @else {
+                  Change Password
+                }
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="togglePasswordForm()"
+              >
+                Cancel
+              </button>
+            </div>
+
+            @if (changePasswordState() === 'success') {
+              <div class="success-message">Password changed successfully!</div>
+            }
+          </form>
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -4,6 +4,38 @@ All notable changes to NexusBank project.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-14
+
+### Added
+- **Profile Page** (`/profile`)
+  - View user profile information
+  - Edit first name, last name, phone
+  - Change password with validation (8+ chars, uppercase, lowercase, number, special char)
+
+- **Backend API Endpoints**
+  - `POST /api/auth/logout` - Token invalidation (blacklist)
+  - `POST /api/auth/change-password` - Password change with validation
+  - `GET /api/profile` - Get user profile
+  - `PUT /api/profile` - Update profile
+  - `GET /api/beneficiaries` - List beneficiaries
+  - `POST /api/beneficiaries` - Add beneficiary
+  - `DELETE /api/beneficiaries/:id` - Remove beneficiary
+
+- **Unit Tests** (29 new tests)
+  - `ApiService` - 11 tests
+  - `AuthInterceptor` - 4 tests
+  - `ErrorInterceptor` - 5 tests
+  - `AuthGuard` - 5 tests
+  - `AuthService` - additional 4 tests
+
+- **E2E Tests** (10 new tests)
+  - Login flow tests
+  - Registration flow tests
+  - Netbanking dashboard tests
+
+### Fixed
+- **CRITICAL**: Password hash bug in registration (was storing plain text, now stores hashed)
+
 ## [1.0.0] - 2026-04-14
 
 ### Added
