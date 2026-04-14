@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { trigger, state, style, transition, animate } from '@angular/animations';
@@ -10,11 +10,13 @@ import { Account, Transaction, LoadingState } from '../../models';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
 import { CardComponent } from '../../components/card';
+import { CurrencyPipe } from '../../pipes/currency.pipe';
+import { DateFormatPipe } from '../../pipes/date-format.pipe';
 
 @Component({
   selector: 'app-netbanking',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent, CardComponent],
+  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent, CardComponent, CurrencyPipe, DateFormatPipe],
   templateUrl: './netbanking.html',
   styleUrl: './netbanking.scss',
   animations: [
@@ -67,8 +69,10 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
   // Forms
   transferForm!: FormGroup;
+  batchTransferForm!: FormGroup;
   selectedAccount = signal<Account | null>(null);
   selectedTransaction = signal<Transaction | null>(null);
+  showBatchTransfer = signal(false);
 
   // User info
   user = computed(() => this.authService.user());
@@ -117,6 +121,37 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
       amount: [null, [Validators.required, Validators.min(1), Validators.max(1000000)]],
       description: [''],
     });
+
+    this.initBatchTransferForm();
+  }
+
+  private initBatchTransferForm(): void {
+    this.batchTransferForm = this.fb.group({
+      fromAccountId: ['', Validators.required],
+      recipients: this.fb.array([this.createRecipientGroup()])
+    });
+  }
+
+  private createRecipientGroup(): import('@angular/forms').AbstractControl {
+    return this.fb.group({
+      toAccountNumber: ['', [Validators.required, Validators.pattern(/^\d{10,14}$/)]],
+      amount: [null, [Validators.required, Validators.min(1), Validators.max(1000000)]],
+      description: [''],
+    });
+  }
+
+  get recipients(): FormArray {
+    return this.batchTransferForm.get('recipients') as FormArray;
+  }
+
+  addRecipient(): void {
+    this.recipients.push(this.createRecipientGroup());
+  }
+
+  removeRecipient(index: number): void {
+    if (this.recipients.length > 1) {
+      this.recipients.removeAt(index);
+    }
   }
 
   loadAccounts(): void {
@@ -179,6 +214,52 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     this.showTransfer.set(!this.showTransfer());
     this.showAccounts.set(false);
     this.showTransactions.set(false);
+    this.showBatchTransfer.set(false);
+  }
+
+  toggleBatchTransfer(): void {
+    this.showBatchTransfer.set(!this.showBatchTransfer());
+  }
+
+  onBatchTransfer(): void {
+    if (this.batchTransferForm.invalid) {
+      this.batchTransferForm.markAllAsTouched();
+      return;
+    }
+
+    this.transferState.set('loading');
+    const formValue = this.batchTransferForm.value;
+    const recipientArray = formValue.recipients as { toAccountNumber: string; amount: number; description: string }[];
+
+    let completed = 0;
+    let hasError = false;
+
+    recipientArray.forEach((recipient) => {
+      this.apiService.transfer({
+        fromAccountId: formValue.fromAccountId,
+        toAccountNumber: recipient.toAccountNumber,
+        amount: recipient.amount,
+        description: recipient.description || 'Batch Transfer',
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          completed++;
+          if (completed === recipientArray.length && !hasError) {
+            this.transferState.set('success');
+            this.showToastMessage(`Successfully transferred to ${completed} recipients!`, 'success');
+            this.initBatchTransferForm();
+            this.loadAccounts();
+            this.showBatchTransfer.set(false);
+          }
+        },
+        error: (err: Error) => {
+          hasError = true;
+          this.transferState.set('error');
+          this.showToastMessage(err.message || 'Batch transfer failed', 'error');
+        },
+      });
+    });
   }
 
   viewTransactions(): void {
@@ -268,26 +349,6 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   hasError(field: string, errorCode: string): boolean {
     const control = this.transferForm.get(field);
     return !!(control?.touched && control?.hasError(errorCode));
-  }
-
-  formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  }
-
-  formatDate(dateStr: string): string {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   }
 
   viewTransactionDetail(txn: Transaction): void {

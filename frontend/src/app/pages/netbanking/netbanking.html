@@ -78,7 +78,7 @@
                 <div class="account-number">{{ account.accountNumber }}</div>
                 <div class="account-balance">
                   <span class="label">Balance:</span>
-                  <span class="value">{{ formatCurrency(account.balance) }}</span>
+                  <span class="value">{{ account.balance | currencyFormat }}</span>
                 </div>
               </div>
             } @empty {
@@ -168,88 +168,174 @@
     }
     
     @if (showTransfer()) {
-      <div class="section transfer-form">
-        <h2>Transfer Funds</h2>
+      <div class="section transfer-form" @fadeIn>
+        <div class="transfer-tabs">
+          <button 
+            type="button"
+            [class.active]="!showBatchTransfer()"
+            (click)="showBatchTransfer.set(false)"
+          >
+            Single Transfer
+          </button>
+          <button 
+            type="button"
+            [class.active]="showBatchTransfer()"
+            (click)="toggleBatchTransfer()"
+          >
+            Batch Transfer
+          </button>
+        </div>
         
-        <form [formGroup]="transferForm" (ngSubmit)="onTransfer()">
-          <div class="form-group">
-            <label for="fromAccount">From Account</label>
-            <select 
-              id="fromAccount"
-              formControlName="fromAccountId"
-              [class.is-invalid]="hasError('fromAccountId', 'required')"
-            >
-              @for (account of accounts(); track account.id) {
-                <option [value]="account.id">
-                  {{ account.accountNumber }} - {{ formatCurrency(account.balance) }}
-                </option>
+        @if (!showBatchTransfer()) {
+          <form [formGroup]="transferForm" (ngSubmit)="onTransfer()">
+            <div class="form-group">
+              <label for="fromAccount">From Account</label>
+              <select 
+                id="fromAccount"
+                formControlName="fromAccountId"
+                [class.is-invalid]="hasError('fromAccountId', 'required')"
+              >
+                @for (account of accounts(); track account.id) {
+                  <option [value]="account.id">
+                    {{ account.accountNumber }} - {{ account.balance | currencyFormat }}
+                  </option>
+                }
+              </select>
+            </div>
+          
+            <div class="form-group" [class.has-error]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')">
+              <label for="toAccount">To Account Number</label>
+              <input 
+                id="toAccount"
+                type="text" 
+                formControlName="toAccountNumber"
+                placeholder="Enter 10-14 digit account number"
+                [class.is-invalid]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')"
+              >
+              @if (hasError('toAccountNumber', 'required')) {
+                <span class="error-message">Account number is required</span>
               }
-            </select>
-          </div>
-          
-          <div class="form-group" [class.has-error]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')">
-            <label for="toAccount">To Account Number</label>
-            <input 
-              id="toAccount"
-              type="text" 
-              formControlName="toAccountNumber"
-              placeholder="Enter 10-14 digit account number"
-              [class.is-invalid]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')"
+              @if (hasError('toAccountNumber', 'pattern')) {
+                <span class="error-message">Account number must be 10-14 digits</span>
+              }
+            </div>
+            
+            <div class="form-group" [class.has-error]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')">
+              <label for="amount">Amount (USD)</label>
+              <input 
+                id="amount"
+                type="number" 
+                formControlName="amount"
+                placeholder="Enter amount"
+                [class.is-invalid]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')"
+              >
+              @if (hasError('amount', 'required')) {
+                <span class="error-message">Amount is required</span>
+              }
+              @if (hasError('amount', 'min')) {
+                <span class="error-message">Minimum amount is $1</span>
+              }
+              @if (hasError('amount', 'max')) {
+                <span class="error-message">Maximum amount is $1,000,000</span>
+              }
+            </div>
+            
+            <div class="form-group">
+              <label for="description">Description (Optional)</label>
+              <input 
+                id="description"
+                type="text" 
+                formControlName="description"
+                placeholder="Enter description"
+              >
+            </div>
+            
+            <button 
+              type="submit" 
+              class="btn btn-primary"
+              [disabled]="transferForm.invalid || transferState() === 'loading'"
             >
-            @if (hasError('toAccountNumber', 'required')) {
-              <span class="error-message">Account number is required</span>
-            }
-            @if (hasError('toAccountNumber', 'pattern')) {
-              <span class="error-message">Account number must be 10-14 digits</span>
-            }
-          </div>
-          
-          <div class="form-group" [class.has-error]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')">
-            <label for="amount">Amount (USD)</label>
-            <input 
-              id="amount"
-              type="number" 
-              formControlName="amount"
-              placeholder="Enter amount"
-              [class.is-invalid]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')"
+              {{ transferState() === 'loading' ? 'Processing...' : 'Transfer' }}
+            </button>
+            
+            <button 
+              type="button" 
+              class="btn btn-secondary"
+              (click)="showTransfer.set(false)"
             >
-            @if (hasError('amount', 'required')) {
-              <span class="error-message">Amount is required</span>
-            }
-            @if (hasError('amount', 'min')) {
-              <span class="error-message">Minimum amount is $1</span>
-            }
-            @if (hasError('amount', 'max')) {
-              <span class="error-message">Maximum amount is $1,000,000</span>
-            }
-          </div>
-          
-          <div class="form-group">
-            <label for="description">Description (Optional)</label>
-            <input 
-              id="description"
-              type="text" 
-              formControlName="description"
-              placeholder="Enter description"
-            >
-          </div>
-          
-          <button 
-            type="submit" 
-            class="btn btn-primary"
-            [disabled]="transferForm.invalid || transferState() === 'loading'"
-          >
-            {{ transferState() === 'loading' ? 'Processing...' : 'Transfer' }}
-          </button>
-          
-          <button 
-            type="button" 
-            class="btn btn-secondary"
-            (click)="showTransfer.set(false)"
-          >
-            Cancel
-          </button>
-        </form>
+              Cancel
+            </button>
+          </form>
+        } @else {
+          <form [formGroup]="batchTransferForm" (ngSubmit)="onBatchTransfer()">
+            <div class="form-group">
+              <label for="batchFromAccount">From Account</label>
+              <select 
+                id="batchFromAccount"
+                formControlName="fromAccountId"
+              >
+                @for (account of accounts(); track account.id) {
+                  <option [value]="account.id">
+                    {{ account.accountNumber }} - {{ account.balance | currencyFormat }}
+                  </option>
+                }
+              </select>
+            </div>
+            
+            <div class="recipients-list">
+              <h4>Recipients</h4>
+              @for (recipient of recipients.controls; track $index) {
+                <div class="recipient-group" [formGroupName]="$index">
+                  <div class="recipient-header">
+                    <span>Recipient {{ $index + 1 }}</span>
+                    @if (recipients.length > 1) {
+                      <button type="button" class="btn-remove" (click)="removeRecipient($index)">Remove</button>
+                    }
+                  </div>
+                  <div class="recipient-fields">
+                    <input 
+                      type="text" 
+                      formControlName="toAccountNumber"
+                      placeholder="Account Number"
+                    >
+                    <input 
+                      type="number" 
+                      formControlName="amount"
+                      placeholder="Amount"
+                    >
+                    <input 
+                      type="text" 
+                      formControlName="description"
+                      placeholder="Description (optional)"
+                    >
+                  </div>
+                </div>
+              }
+            </div>
+            
+            <button type="button" class="btn btn-add" (click)="addRecipient()">
+              + Add Another Recipient
+            </button>
+            
+            <div class="form-actions">
+              <button 
+                type="submit" 
+                class="btn btn-primary"
+                [disabled]="batchTransferForm.invalid || transferState() === 'loading'"
+              >
+                {{ transferState() === 'loading' ? 'Processing...' : 'Send All Transfers' }}
+              </button>
+              
+              <button 
+                type="button" 
+                class="btn btn-secondary"
+                (click)="showBatchTransfer.set(false)"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        }
       </div>
     }
     
@@ -270,10 +356,10 @@
               <div class="transaction-item" (click)="viewTransactionDetail(txn)">
                 <div class="transaction-info">
                   <span class="transaction-desc">{{ txn.description }}</span>
-                  <span class="transaction-date">{{ formatDate(txn.timestamp) }}</span>
+                  <span class="transaction-date">{{ txn.timestamp | dateFormat:'short' }}</span>
                 </div>
                 <div class="transaction-amount" [class.credit]="txn.amount > 0" [class.debit]="txn.amount < 0">
-                  {{ txn.amount > 0 ? '+' : '' }}{{ formatCurrency(txn.amount) }}
+                  {{ txn.amount > 0 ? '+' : '' }}{{ txn.amount | currencyFormat }}
                 </div>
               </div>
             } @empty {
@@ -301,12 +387,12 @@
                 <div class="detail-row">
                   <span class="detail-label">Amount</span>
                   <span class="detail-value" [class.credit]="selectedTransaction()!.amount > 0" [class.debit]="selectedTransaction()!.amount < 0">
-                    {{ selectedTransaction()!.amount > 0 ? '+' : '' }}{{ formatCurrency(selectedTransaction()!.amount) }}
+                    {{ selectedTransaction()!.amount > 0 ? '+' : '' }}{{ selectedTransaction()!.amount | currencyFormat }}
                   </span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Date & Time</span>
-                  <span class="detail-value">{{ formatDate(selectedTransaction()!.timestamp) }}</span>
+                  <span class="detail-value">{{ selectedTransaction()!.timestamp | dateFormat }}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Status</span>
@@ -318,10 +404,10 @@
         }
       </div>
     }
-  </div>
-  
-  <div class="dashboard-footer">
-    <button (click)="logout()" class="btn btn-logout">Logout</button>
+    
+    <div class="dashboard-footer">
+      <button (click)="logout()" class="btn btn-logout">Logout</button>
+    </div>
   </div>
 </section>
 
