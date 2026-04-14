@@ -13,11 +13,16 @@ const transactionRoutes = require('./routes/transactions');
 const profileRoutes = require('./routes/profile');
 const beneficiaryRoutes = require('./routes/beneficiaries');
 
+const swaggerSpec = require('./swagger');
+const swaggerUi = require('swagger-ui-express');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const isRateLimited = process.env.ENABLE_RATE_LIMIT === 'true';
 

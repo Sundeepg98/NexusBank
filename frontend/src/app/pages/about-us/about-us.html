@@ -1,11 +1,27 @@
 <section class="page">
-  <h1>About NexusBank</h1>
-  <p>Founded in 2024, NexusBank has been at the forefront of digital banking innovation.</p>
-  
+  <div class="hero">
+    <h1>About NexusBank</h1>
+    <p>Banking made simple, built for tomorrow</p>
+  </div>
+
+  <div class="stats-bar">
+    @for (stat of stats(); track stat.label) {
+      <div class="stat-item">
+        <span class="stat-value">{{ stat.value }}</span>
+        <span class="stat-label">{{ stat.label }}</span>
+      </div>
+    }
+  </div>
+
   <div class="content">
     <div class="mission">
       <h2>Our Mission</h2>
       <p>To provide seamless, secure, and innovative banking solutions that empower individuals and businesses to achieve their financial goals.</p>
+    </div>
+    
+    <div class="vision">
+      <h2>Our Vision</h2>
+      <p>To be the most trusted and innovative digital banking partner, transforming how people interact with their finances.</p>
     </div>
     
     <div class="values">
@@ -17,5 +33,30 @@
         <li><strong>Transparency:</strong> No hidden fees or charges</li>
       </ul>
     </div>
+  </div>
+
+  <div class="story">
+    <h2>Our Story</h2>
+    <p>Founded in 2024, NexusBank has been at the forefront of digital banking innovation. We started with a simple vision: make banking accessible, secure, and convenient for everyone. Today, we serve millions of customers across the globe, offering a comprehensive suite of banking services that cater to both personal and business needs.</p>
+    <p>Our team of experts works tirelessly to ensure that every interaction you have with NexusBank is smooth, secure, and rewarding. From everyday transactions to complex financial planning, we are here to support your journey every step of the way.</p>
+  </div>
+
+  <div class="team">
+    <h2>Leadership Team</h2>
+    <div class="team-grid">
+      @for (member of teamMembers(); track member.name) {
+        <div class="team-card">
+          <img [src]="member.image" [alt]="member.name" class="team-avatar">
+          <h3>{{ member.name }}</h3>
+          <p>{{ member.role }}</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="contact-cta">
+    <h2>Get in Touch</h2>
+    <p>Have questions? We'd love to hear from you.</p>
+    <a routerLink="/contact" class="btn-primary">Contact Us</a>
   </div>
 </section>

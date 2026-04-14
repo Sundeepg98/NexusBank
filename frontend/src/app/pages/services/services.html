@@ -1,30 +1,54 @@
 <section class="page">
-  <h1>Our Services</h1>
-  
+  <div class="hero">
+    <h1>Our Services</h1>
+    <p>Comprehensive banking solutions for every need</p>
+  </div>
+
   <div class="services-grid">
-    <div class="service-card">
-      <h3>Personal Banking</h3>
-      <p>Savings accounts, current accounts, and personalized banking solutions</p>
+    @for (service of services(); track service.title) {
+      <div class="service-card">
+        <div class="service-icon">{{ service.icon }}</div>
+        <h3>{{ service.title }}</h3>
+        <p>{{ service.description }}</p>
+        <div class="service-benefits">
+          <h4>Key Benefits:</h4>
+          <ul>
+            @for (benefit of service.benefits; track benefit) {
+              <li>{{ benefit }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="account-types">
+    <h2>Account Types</h2>
+    <div class="account-grid">
+      @for (account of accountTypes(); track account.name) {
+        <div class="account-card">
+          <h3>{{ account.name }}</h3>
+          <div class="interest-rate">{{ account.interest }}</div>
+          <ul class="features">
+            @for (feature of account.features; track feature) {
+              <li>{{ feature }}</li>
+            }
+          </ul>
+          <button class="btn">Open Account</button>
+        </div>
+      }
     </div>
-    <div class="service-card">
-      <h3>Business Banking</h3>
-      <p>Corporate accounts, merchant services, and business loans</p>
-    </div>
-    <div class="service-card">
-      <h3>Investments</h3>
-      <p>Fixed deposits, mutual funds, and portfolio management</p>
-    </div>
-    <div class="service-card">
-      <h3>Loans</h3>
-      <p>Personal loans, home loans, and auto loans with competitive rates</p>
-    </div>
-    <div class="service-card">
-      <h3>Insurance</h3>
-      <p>Life insurance, health insurance, and general insurance products</p>
-    </div>
-    <div class="service-card">
-      <h3>Cards</h3>
-      <p>Credit cards, debit cards, and prepaid cards with exciting benefits</p>
+  </div>
+
+  <div class="why-choose">
+    <h2>Why Choose NexusBank?</h2>
+    <div class="benefits-list">
+      @for (benefit of whyChooseUs(); track benefit) {
+        <div class="benefit-item">
+          <span class="check">✓</span>
+          <span>{{ benefit }}</span>
+        </div>
+      }
     </div>
   </div>
 </section>

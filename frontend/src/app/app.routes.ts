@@ -19,7 +19,12 @@ export const routes: Routes = [
   },
   {
     path: 'contact-us',
-    loadComponent: () => import('./pages/contact-us/contact-us').then(m => m.ContactUs)
+    loadComponent: () => import('./pages/contact/contact').then(m => m.Contact)
+  },
+  {
+    path: 'contact',
+    redirectTo: 'contact-us',
+    pathMatch: 'full'
   },
   {
     path: 'welcome',

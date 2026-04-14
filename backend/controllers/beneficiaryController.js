@@ -92,4 +92,38 @@ const deleteBeneficiary = async (req, res) => {
   }
 };
 
-module.exports = { getBeneficiaries, addBeneficiary, deleteBeneficiary };
+const updateBeneficiary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nickname, bankName } = req.body;
+    
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})-[:HAS_BENEFICIARY]->(b:Beneficiary {id: $id})
+         SET b.nickname = $nickname, b.bankName = $bankName
+         RETURN b`,
+        { userId: req.user.userId, id, nickname, bankName }
+      )
+    );
+    
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Beneficiary not found' });
+    }
+    
+    const beneficiary = result.records[0].get('b').properties;
+    res.json({
+      message: 'Beneficiary updated',
+      beneficiary: {
+        id: beneficiary.id,
+        accountNumber: beneficiary.accountNumber,
+        nickname: beneficiary.nickname,
+        bankName: beneficiary.bankName
+      }
+    });
+  } catch (error) {
+    console.error('Update beneficiary error:', error);
+    res.status(500).json({ error: 'Failed to update beneficiary' });
+  }
+};
+
+module.exports = { getBeneficiaries, addBeneficiary, deleteBeneficiary, updateBeneficiary };
