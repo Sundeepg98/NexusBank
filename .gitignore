@@ -1,0 +1,22 @@
+# Root level ignores
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+build.log
+*.log
+
+# Playwright MCP
+.playwright-mcp/
+
+# Screenshots
+*.png
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

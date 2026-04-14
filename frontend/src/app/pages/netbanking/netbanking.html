@@ -1,0 +1,216 @@
+<section class="page">
+  <div class="dashboard">
+    <header class="dashboard-header">
+      <h1>Net Banking Dashboard</h1>
+      <p class="welcome-text">Welcome back, {{ userName() }}!</p>
+    </header>
+    
+    <div class="dashboard-grid">
+      <div 
+        class="dashboard-card" 
+        [class.active]="showAccounts()"
+        (click)="viewAccounts()"
+      >
+        <div class="card-icon">🏦</div>
+        <h3>My Accounts</h3>
+        <p>View your account details and balances</p>
+      </div>
+      
+      <div 
+        class="dashboard-card" 
+        [class.active]="showTransfer()"
+        (click)="transferFunds()"
+      >
+        <div class="card-icon">💸</div>
+        <h3>Fund Transfer</h3>
+        <p>Transfer money to other accounts</p>
+      </div>
+      
+      <div 
+        class="dashboard-card" 
+        [class.active]="showTransactions()"
+        (click)="viewTransactions()"
+      >
+        <div class="card-icon">📊</div>
+        <h3>Transactions</h3>
+        <p>View your transaction history</p>
+      </div>
+      
+      <div class="dashboard-card" (click)="profile()">
+        <div class="card-icon">👤</div>
+        <h3>Profile</h3>
+        <p>Manage your account settings</p>
+      </div>
+    </div>
+    
+    @if (showAccounts()) {
+      <div class="section">
+        <h2>Your Accounts</h2>
+        
+        @if (loadState() === 'loading') {
+          <div class="loading-placeholder">Loading accounts...</div>
+        } @else if (loadState() === 'error') {
+          <div class="error-placeholder">
+            <p>Failed to load accounts</p>
+            <button class="btn-small" (click)="loadAccounts()">Retry</button>
+          </div>
+        } @else {
+          @for (account of accounts(); track account.id) {
+            <div 
+              class="account-card"
+              [class.selected]="selectedAccount()?.id === account.id"
+              (click)="selectAccount(account)"
+            >
+              <div class="account-header">
+                <span class="account-type">{{ account.accountType }}</span>
+                @if (selectedAccount()?.id === account.id) {
+                  <span class="selected-badge">Selected</span>
+                }
+              </div>
+              <div class="account-number">{{ account.accountNumber }}</div>
+              <div class="account-balance">
+                <span class="label">Balance:</span>
+                <span class="value">{{ formatCurrency(account.balance) }}</span>
+              </div>
+            </div>
+          } @empty {
+            <p class="empty-state">No accounts found</p>
+          }
+        }
+      </div>
+    }
+    
+    @if (showTransfer()) {
+      <div class="section transfer-form">
+        <h2>Transfer Funds</h2>
+        
+        <form [formGroup]="transferForm" (ngSubmit)="onTransfer()">
+          <div class="form-group">
+            <label for="fromAccount">From Account</label>
+            <select 
+              id="fromAccount"
+              formControlName="fromAccountId"
+              [class.is-invalid]="hasError('fromAccountId', 'required')"
+            >
+              @for (account of accounts(); track account.id) {
+                <option [value]="account.id">
+                  {{ account.accountNumber }} - {{ formatCurrency(account.balance) }}
+                </option>
+              }
+            </select>
+          </div>
+          
+          <div class="form-group" [class.has-error]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')">
+            <label for="toAccount">To Account Number</label>
+            <input 
+              id="toAccount"
+              type="text" 
+              formControlName="toAccountNumber"
+              placeholder="Enter 10-14 digit account number"
+              [class.is-invalid]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')"
+            >
+            @if (hasError('toAccountNumber', 'required')) {
+              <span class="error-message">Account number is required</span>
+            }
+            @if (hasError('toAccountNumber', 'pattern')) {
+              <span class="error-message">Account number must be 10-14 digits</span>
+            }
+          </div>
+          
+          <div class="form-group" [class.has-error]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')">
+            <label for="amount">Amount (USD)</label>
+            <input 
+              id="amount"
+              type="number" 
+              formControlName="amount"
+              placeholder="Enter amount"
+              [class.is-invalid]="hasError('amount', 'required') || hasError('amount', 'min') || hasError('amount', 'max')"
+            >
+            @if (hasError('amount', 'required')) {
+              <span class="error-message">Amount is required</span>
+            }
+            @if (hasError('amount', 'min')) {
+              <span class="error-message">Minimum amount is $1</span>
+            }
+            @if (hasError('amount', 'max')) {
+              <span class="error-message">Maximum amount is $1,000,000</span>
+            }
+          </div>
+          
+          <div class="form-group">
+            <label for="description">Description (Optional)</label>
+            <input 
+              id="description"
+              type="text" 
+              formControlName="description"
+              placeholder="Enter description"
+            >
+          </div>
+          
+          <button 
+            type="submit" 
+            class="btn btn-primary"
+            [disabled]="transferForm.invalid || transferState() === 'loading'"
+          >
+            {{ transferState() === 'loading' ? 'Processing...' : 'Transfer' }}
+          </button>
+          
+          <button 
+            type="button" 
+            class="btn btn-secondary"
+            (click)="showTransfer.set(false)"
+          >
+            Cancel
+          </button>
+        </form>
+      </div>
+    }
+    
+    @if (showTransactions()) {
+      <div class="section">
+        <h2>Recent Transactions</h2>
+        
+        @if (loadState() === 'loading') {
+          <div class="loading-placeholder">Loading transactions...</div>
+        } @else if (loadState() === 'error') {
+          <div class="error-placeholder">
+            <p>Failed to load transactions</p>
+            <button class="btn-small" (click)="viewTransactions()">Retry</button>
+          </div>
+        } @else {
+          <div class="transactions-list">
+            @for (txn of transactions(); track txn.id) {
+              <div class="transaction-item">
+                <div class="transaction-info">
+                  <span class="transaction-desc">{{ txn.description }}</span>
+                  <span class="transaction-date">{{ formatDate(txn.timestamp) }}</span>
+                </div>
+                <div class="transaction-amount" [class.credit]="txn.amount > 0" [class.debit]="txn.amount < 0">
+                  {{ txn.amount > 0 ? '+' : '' }}{{ formatCurrency(txn.amount) }}
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-state">No transactions found</p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+  
+  <div class="dashboard-footer">
+    <button (click)="logout()" class="btn btn-logout">Logout</button>
+  </div>
+</section>
+
+<app-toast 
+  [show]="showToast()" 
+  [message]="toastMessage()" 
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>
+
+<app-loading 
+  [show]="loadState() === 'loading' || transferState() === 'loading'" 
+  [message]="transferState() === 'loading' ? 'Processing transfer...' : ''" 
+/>

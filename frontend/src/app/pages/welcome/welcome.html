@@ -1,0 +1,67 @@
+<section class="page">
+  <h1>Welcome to NexusBank</h1>
+  <p>Please login to access your accounts and make transactions.</p>
+  
+  <div class="login-section">
+    <div class="login-form">
+      <h2>Login</h2>
+      
+      <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
+        <div class="form-group" [class.has-error]="hasError('email', 'required') || hasError('email', 'email')">
+          <label for="email">Email</label>
+          <input 
+            id="email"
+            type="email" 
+            formControlName="email" 
+            placeholder="Enter your email"
+            [class.is-invalid]="hasError('email', 'required') || hasError('email', 'email')"
+          >
+          @if (hasError('email', 'required')) {
+            <span class="error-message">Email is required</span>
+          }
+          @if (hasError('email', 'email')) {
+            <span class="error-message">Please enter a valid email</span>
+          }
+        </div>
+        
+        <div class="form-group" [class.has-error]="hasError('password', 'required') || hasError('password', 'minlength')">
+          <label for="password">Password</label>
+          <input 
+            id="password"
+            type="password" 
+            formControlName="password" 
+            placeholder="Enter your password"
+            [class.is-invalid]="hasError('password', 'required') || hasError('password', 'minlength')"
+          >
+          @if (hasError('password', 'required')) {
+            <span class="error-message">Password is required</span>
+          }
+          @if (hasError('password', 'minlength')) {
+            <span class="error-message">Password must be at least 6 characters</span>
+          }
+        </div>
+        
+        <button 
+          type="submit" 
+          class="btn" 
+          [disabled]="loginForm.invalid || isLoading()"
+        >
+          {{ isLoading() ? 'Logging in...' : 'Login' }}
+        </button>
+      </form>
+      
+      <p class="register-link">
+        Don't have an account? <a routerLink="/register">Register here</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<app-toast 
+  [show]="showToast()" 
+  [message]="toastMessage()" 
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>
+
+<app-loading [show]="isLoading()" message="Authenticating..." />
