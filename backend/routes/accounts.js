@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getAccounts, getAccountById, getAccountBalance } = require('../controllers/accountController');
-const authMiddleware = require('../middleware/auth');
+const { getAccounts, createAccount, getAccountStatement } = require('../controllers/accountController');
+const { authMiddleware } = require('../middleware/auth');
 
 router.use(authMiddleware);
 
 router.get('/', getAccounts);
-router.get('/:accountId', getAccountById);
-router.get('/:accountId/balance', getAccountBalance);
+router.post('/', createAccount);
+router.get('/:id/statement', getAccountStatement);
 
 module.exports = router;

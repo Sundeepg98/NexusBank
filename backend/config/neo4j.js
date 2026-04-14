@@ -8,4 +8,13 @@ const driver = neo4j.driver(
 
 const session = driver.session();
 
-module.exports = { driver, session };
+const withSession = async (callback) => {
+  const s = driver.session();
+  try {
+    return await callback(s);
+  } finally {
+    await s.close();
+  }
+};
+
+module.exports = { driver, session, withSession };
