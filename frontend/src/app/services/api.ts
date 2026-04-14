@@ -97,6 +97,25 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
+  generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; otp: string }> {
+    return this.http
+      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/transfer/generate-otp`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  verifyOTP(data: {
+    otpId: string;
+    otp: string;
+    fromAccountId: string;
+    toAccountNumber: string;
+    amount: number;
+    description?: string;
+  }): Observable<{ success: boolean; transactionId: string }> {
+    return this.http
+      .post<{ success: boolean; transactionId: string }>(`${this.baseUrl}/transfer/verify-otp`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
   changePassword(data: { currentPassword: string; newPassword: string }): Observable<{ message: string }> {
     return this.http
       .post<{ message: string }>(`${this.baseUrl}/auth/change-password`, data)

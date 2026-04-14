@@ -250,13 +250,46 @@
               >
             </div>
             
-            <button 
-              type="submit" 
-              class="btn btn-primary"
-              [disabled]="transferForm.invalid || transferState() === 'loading'"
-            >
-              {{ transferState() === 'loading' ? 'Processing...' : 'Transfer' }}
-            </button>
+            @if (!showOTPInput()) {
+              <button 
+                type="submit" 
+                class="btn btn-primary"
+                [disabled]="transferForm.invalid || transferState() === 'loading'"
+              >
+                {{ transferState() === 'loading' ? 'Generating OTP...' : 'Transfer' }}
+              </button>
+            } @else {
+              <div class="otp-section">
+                <div class="form-group">
+                  <label for="otp">Enter OTP (6 digits)</label>
+                  <input 
+                    id="otp"
+                    type="text" 
+                    [value]="otpValue()"
+                    (input)="otpValue.set($any($event.target).value)"
+                    placeholder="Enter 6-digit OTP"
+                    maxlength="6"
+                    class="otp-input"
+                  >
+                </div>
+                
+                <button 
+                  type="submit" 
+                  class="btn btn-primary"
+                  [disabled]="transferForm.invalid || otpState() === 'loading'"
+                >
+                  {{ otpState() === 'loading' ? 'Verifying OTP...' : 'Confirm Transfer' }}
+                </button>
+                
+                <button 
+                  type="button" 
+                  class="btn btn-secondary"
+                  (click)="resetTransferState()"
+                >
+                  Cancel
+                </button>
+              </div>
+            }
             
             <button 
               type="button" 
@@ -367,6 +400,10 @@
             }
           </div>
         }
+        
+        <button class="btn btn-secondary" (click)="downloadStatement()">
+          Download Statement
+        </button>
         
         @if (selectedTransaction()) {
           <div class="transaction-detail-overlay" (click)="closeTransactionDetail()">

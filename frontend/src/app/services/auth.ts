@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { User } from '../models';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root',
@@ -7,6 +8,8 @@ import { User } from '../models';
 export class AuthService {
   private readonly tokenKey = 'nexusbank_token';
   private readonly userKey = 'nexusbank_user';
+  private sessionTimeout = 30 * 60 * 1000;
+  private lastActivity: number = Date.now();
 
   private tokenSignal = signal<string | null>(this.getTokenFromStorage());
   private userSignal = signal<User | null>(this.getUserFromStorage());
@@ -20,6 +23,7 @@ export class AuthService {
     localStorage.setItem(this.userKey, JSON.stringify(user));
     this.tokenSignal.set(token);
     this.userSignal.set(user);
+    this.updateActivity();
   }
 
   logout(): void {
@@ -35,6 +39,21 @@ export class AuthService {
 
   getUser(): User | null {
     return this.userSignal();
+  }
+
+  checkSession(): boolean {
+    if (this.isAuthenticated()) {
+      const idle = Date.now() - this.lastActivity;
+      if (idle > this.sessionTimeout) {
+        this.logout();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  updateActivity(): void {
+    this.lastActivity = Date.now();
   }
 
   private getTokenFromStorage(): string | null {

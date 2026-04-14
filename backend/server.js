@@ -4,6 +4,13 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const neo4j = require('neo4j-driver');
+const crypto = require('crypto');
+
+const otpStore = new Map();
+
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 dotenv.config({ path: require('path').join(__dirname, '.env') });
 
@@ -40,6 +47,24 @@ const authMiddleware = (req, res, next) => {
     res.status(401).json({ error: 'Invalid token' });
   }
 };
+
+const rateLimit = require('express-rate-limit');
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please try again later' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many authentication attempts, please try again later' }
+});
+
+app.use('/api', apiLimiter);
+
+app.use('/api/auth/register', authLimiter);
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -108,6 +133,8 @@ const userResult = await withSession(session =>
     res.status(500).json({ error: 'Registration failed: ' + error.message });
   }
 });
+
+app.use('/api/auth/login', authLimiter);
 
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -217,6 +244,84 @@ app.post('/api/accounts', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/accounts/:id/statement', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { format = 'json', from, to } = req.query;
+
+    let dateFilter = '';
+    if (from && to) {
+      dateFilter = 'AND t.timestamp >= datetime($from) AND t.timestamp <= datetime($to)';
+    } else if (from) {
+      dateFilter = 'AND t.timestamp >= datetime($from)';
+    } else if (to) {
+      dateFilter = 'AND t.timestamp <= datetime($to)';
+    }
+
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
+         WHERE true ${dateFilter}
+         RETURN t ORDER BY t.timestamp DESC`,
+        { accountId: id, from, to }
+      )
+    );
+
+    const accountResult = await withSession(session =>
+      session.run(
+        `MATCH (a:Account {id: $accountId}) RETURN a`,
+        { accountId: id }
+      )
+    );
+
+    if (accountResult.records.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const account = accountResult.records[0].get('a').properties;
+    const transactions = result.records.map(r => {
+      const props = r.get('t').properties;
+      let timestamp = props.timestamp;
+      if (timestamp && typeof timestamp === 'object') {
+        const t = timestamp;
+        timestamp = `${t.year.low || t.year}-${String(t.month.low || t.month).padStart(2, '0')}-${String(t.day.low || t.day).padStart(2, '0')}T${String(t.hour.low || t.hour || 0).padStart(2, '0')}:${String(t.minute.low || t.minute || 0).padStart(2, '0')}:${String(t.second.low || t.second || 0).padStart(2, '0')}`;
+      }
+      return {
+        id: props.id,
+        amount: neo4j.isInt(props.amount) ? props.amount.toNumber() : props.amount,
+        description: props.description,
+        timestamp
+      };
+    });
+
+    if (format === 'csv') {
+      const csvHeader = 'Date,Description,Amount\n';
+      const csvRows = transactions.map(t => 
+        `"${t.timestamp}","${t.description}",${t.amount}`
+      ).join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=statement-${id}.csv`);
+      res.send(csvHeader + csvRows);
+    } else {
+      res.json({
+        statement: {
+          accountId: id,
+          accountNumber: account.accountNumber,
+          accountType: account.accountType,
+          fromDate: from,
+          toDate: to,
+          generatedAt: new Date().toISOString(),
+          transactions
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Get statement error:', error);
+    res.status(500).json({ error: 'Failed to get statement' });
+  }
+});
+
 app.post('/api/transactions/transfer', authMiddleware, async (req, res) => {
   try {
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
@@ -273,22 +378,142 @@ app.post('/api/transactions/transfer', authMiddleware, async (req, res) => {
       return writeResult;
     });
 
-    res.json({ message: 'Transfer successful' });
+res.json({ message: 'Transfer successful' });
   } catch (error) {
     console.error('Transfer error:', error);
     res.status(500).json({ error: 'Transfer failed' });
   }
 });
 
+app.post('/api/transfer/generate-otp', authMiddleware, async (req, res) => {
+  try {
+    const { fromAccountId, toAccountNumber, amount } = req.body;
+
+    if (!fromAccountId || !toAccountNumber || !amount) {
+      return res.status(400).json({ error: 'fromAccountId, toAccountNumber, and amount are required' });
+    }
+
+    const otp = generateOTP();
+    const otpId = crypto.randomUUID();
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+
+    otpStore.set(otpId, {
+      otp,
+      expiresAt,
+      transferData: { fromAccountId, toAccountNumber, amount }
+    });
+
+    res.json({ message: 'OTP sent', otpId, otp });
+  } catch (error) {
+    console.error('Generate OTP error:', error);
+    res.status(500).json({ error: 'Failed to generate OTP' });
+  }
+});
+
+app.post('/api/transfer/verify-otp', authMiddleware, async (req, res) => {
+  try {
+    const { otpId, otp, fromAccountId, toAccountNumber, amount, description } = req.body;
+
+    const stored = otpStore.get(otpId);
+
+    if (!stored || stored.expiresAt < Date.now()) {
+      otpStore.delete(otpId);
+      return res.status(400).json({ error: 'OTP expired or invalid' });
+    }
+
+    if (stored.otp !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+
+    if (stored.transferData.fromAccountId !== fromAccountId ||
+        stored.transferData.toAccountNumber !== toAccountNumber ||
+        stored.transferData.amount != amount) {
+      return res.status(400).json({ error: 'Transfer details mismatch' });
+    }
+
+    otpStore.delete(otpId);
+
+    const fromResult = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
+         RETURN a`,
+        { userId: req.user.userId, accountId: fromAccountId }
+      )
+    );
+
+    if (fromResult.records.length === 0) {
+      return res.status(404).json({ error: 'Source account not found' });
+    }
+
+    const fromAccount = fromResult.records[0].get('a').properties;
+    if (fromAccount.balance < amount) {
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+
+    const toResult = await withSession(session =>
+      session.run(
+        `MATCH (a:Account {accountNumber: $accountNumber}) RETURN a`,
+        { accountNumber: toAccountNumber }
+      )
+    );
+
+    if (toResult.records.length === 0) {
+      return res.status(404).json({ error: 'Destination account not found' });
+    }
+
+    const toAccount = toResult.records[0].get('a').properties;
+
+    const txnId = crypto.randomUUID();
+
+    await withSession(async (session) => {
+      await session.run(
+        `MATCH (from:Account {id: $fromId})
+         MATCH (to:Account {id: $toId})
+         CREATE (t:Transaction {
+           id: $txnId,
+           amount: $amount,
+           description: $description,
+           timestamp: datetime()
+         })
+         CREATE (from)-[:SENT]->(t)-[:RECEIVED]->(to)
+         WITH t
+         MATCH (from:Account {id: $fromId})
+         SET from.balance = from.balance - $amount
+         MATCH (to:Account {id: $toId})
+         SET to.balance = to.balance + $amount
+         RETURN t`,
+        { fromId: fromAccountId, toId: toAccount.id, txnId, amount: parseFloat(amount), description: description || 'Transfer' }
+      );
+    });
+
+    res.json({ success: true, transactionId: txnId });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Transfer failed' });
+  }
+});
+
 app.get('/api/transactions', authMiddleware, async (req, res) => {
   try {
-    const { accountId } = req.query;
+    const { accountId, page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const countResult = await withSession(session =>
+      session.run(
+        `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
+         RETURN count(t) as total`,
+        { accountId }
+      )
+    );
+    const total = countResult.records[0]?.get('total')?.toNumber() || 0;
 
     const result = await withSession(session =>
       session.run(
         `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
-         RETURN t ORDER BY t.timestamp DESC LIMIT 20`,
-        { accountId }
+         RETURN t ORDER BY t.timestamp DESC SKIP $skip LIMIT $limitNum`,
+        { accountId, skip, limitNum }
       )
     );
 
@@ -306,7 +531,16 @@ app.get('/api/transactions', authMiddleware, async (req, res) => {
         timestamp
       };
     });
-res.json({ transactions });
+
+    res.json({
+      transactions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        hasMore: skip + transactions.length < total
+      }
+    });
   } catch (error) {
     console.error('Get transactions error:', error);
     res.status(500).json({ error: 'Failed to get transactions' });

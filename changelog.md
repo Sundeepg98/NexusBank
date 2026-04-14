@@ -4,6 +4,29 @@ All notable changes to NexusBank project.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-04-14
+
+### Added
+- **Security Features**
+  - Rate limiting (100 req/15min general, 5 req/15min for auth)
+  - Transfer OTP confirmation (6-digit OTP before transfer completes)
+  - Session timeout (30 min idle timeout with automatic logout)
+
+- **Backend API Endpoints**
+  - `POST /api/transfer/generate-otp` - Generate OTP for transfer
+  - `POST /api/transfer/verify-otp` - Verify OTP and complete transfer
+  - `GET /api/accounts/:id/statement` - Account statement (CSV/JSON)
+  - Transaction pagination support
+
+- **Frontend Features**
+  - Session timeout with activity tracking
+  - Download statement button
+  - OTP input UI for transfer confirmation
+
+### Fixed
+- `resetTransferState` accessibility (was private, now public)
+- OTP input type error
+
 ## [1.0.1] - 2026-04-14
 
 ### Added
@@ -57,8 +80,6 @@ All notable changes to NexusBank project.
   - Skeleton Loader Component
   - FormArray for dynamic batch transfers
   - Environment files for API URL configuration
-  - Karma test configuration
-  - Unit tests for pipes, CardComponent, AuthService
 
 - **Backend (Node.js/Express)**
   - User registration and login with JWT
@@ -79,4 +100,4 @@ All notable changes to NexusBank project.
 - Account number generation (using `substring(randomUUID(), 0, 12)`)
 
 ### Known Issues
-- Karma unit tests need configuration work for Angular 21's new test builder
+- Karma unit tests need configuration work for Angular 21's new test builder (vitest recommended)

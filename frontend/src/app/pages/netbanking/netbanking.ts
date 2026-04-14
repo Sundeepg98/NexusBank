@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewInit, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -48,6 +48,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(CardComponent) cardComponent!: CardComponent;
   
   private destroy$ = new Subject<void>();
+  private sessionCheckInterval: any;
 
   // State signals
   accounts = signal<Account[]>([]);
@@ -66,6 +67,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   creatingAccount = signal(false);
   selectedAccountType = signal<'SAVINGS' | 'CURRENT' | 'FIXED'>('SAVINGS');
   initialDeposit = signal<number>(0);
+
+  // OTP state
+  showOTPInput = signal(false);
+  otpId = signal('');
+  otpValue = signal('');
+  otpState = signal<LoadingState>('idle');
 
   // Forms
   transferForm!: FormGroup;
@@ -107,11 +114,32 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     } else {
       this.loadAccounts();
     }
+
+    this.sessionCheckInterval = setInterval(() => {
+      if (!this.authService.checkSession()) {
+        this.router.navigate(['/welcome']);
+      }
+    }, 60000);
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.sessionCheckInterval) {
+      clearInterval(this.sessionCheckInterval);
+    }
+  }
+
+  @HostListener('document:mousemove')
+  @HostListener('document:keydown')
+  onActivity(): void {
+    this.authService.updateActivity();
+  }
+
+  downloadStatement(): void {
+    const accountId = this.selectedAccount()?.id;
+    if (!accountId) return;
+    window.open(`/api/accounts/${accountId}/statement?format=csv`, '_blank');
   }
 
   private initTransferForm(): void {
@@ -296,26 +324,63 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     this.transferState.set('loading');
     const formValue = this.transferForm.value;
 
-    this.apiService.transfer({
-      fromAccountId: formValue.fromAccountId,
-      toAccountNumber: formValue.toAccountNumber,
-      amount: formValue.amount,
-      description: formValue.description || 'Transfer',
-    })
-    .pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: () => {
-        this.transferState.set('success');
-        this.showToastMessage('Transfer successful!', 'success');
-        this.transferForm.reset();
-        this.loadAccounts();
-        this.showTransfer.set(false);
-      },
-      error: (err: Error) => {
-        this.transferState.set('error');
-        this.showToastMessage(err.message || 'Transfer failed', 'error');
-      },
-    });
+    if (!this.showOTPInput()) {
+      this.apiService.generateOTP({
+        fromAccountId: formValue.fromAccountId,
+        toAccountNumber: formValue.toAccountNumber,
+        amount: formValue.amount,
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.transferState.set('success');
+          this.otpId.set(response.otpId);
+          this.showOTPInput.set(true);
+          this.showToastMessage(`OTP sent! For demo, your OTP is: ${response.otp}`, 'success');
+        },
+        error: (err: Error) => {
+          this.transferState.set('error');
+          this.showToastMessage(err.message || 'Failed to generate OTP', 'error');
+        },
+      });
+    } else {
+      if (!this.otpValue() || this.otpValue().length !== 6) {
+        this.showToastMessage('Please enter a valid 6-digit OTP', 'error');
+        return;
+      }
+
+      this.otpState.set('loading');
+      this.apiService.verifyOTP({
+        otpId: this.otpId(),
+        otp: this.otpValue(),
+        fromAccountId: formValue.fromAccountId,
+        toAccountNumber: formValue.toAccountNumber,
+        amount: formValue.amount,
+        description: formValue.description || 'Transfer',
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.otpState.set('success');
+          this.showToastMessage('Transfer successful!', 'success');
+          this.resetTransferState();
+          this.loadAccounts();
+          this.showTransfer.set(false);
+        },
+        error: (err: Error) => {
+          this.otpState.set('error');
+          this.showToastMessage(err.message || 'Transfer failed', 'error');
+        },
+      });
+    }
+  }
+
+  resetTransferState(): void {
+    this.transferForm.reset();
+    this.showOTPInput.set(false);
+    this.otpId.set('');
+    this.otpValue.set('');
+    this.transferState.set('idle');
   }
 
   selectAccount(account: Account): void {

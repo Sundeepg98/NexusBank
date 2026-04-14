@@ -7,7 +7,6 @@ import { AuthService } from '../../services/auth';
 import { ApiService } from '../../services/api';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
-import { CurrencyPipe } from '../../pipes/currency.pipe';
 import { DateFormatPipe } from '../../pipes/date-format.pipe';
 import { User } from '../../models';
 
@@ -22,7 +21,6 @@ type ChangePasswordState = 'idle' | 'loading' | 'error' | 'success';
     ReactiveFormsModule,
     ToastComponent,
     LoadingComponent,
-    CurrencyPipe,
     DateFormatPipe
   ],
   templateUrl: './profile.html',
