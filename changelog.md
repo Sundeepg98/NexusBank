@@ -27,6 +27,10 @@ All notable changes to NexusBank project.
 - `resetTransferState` accessibility (was private, now public)
 - OTP input type error
 
+### Testing
+- Vitest test runner configured (replaces Karma)
+- 36 unit tests passing
+
 ## [1.0.1] - 2026-04-14
 
 ### Added
