@@ -99,7 +99,6 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    console.log('Account list element:', this.accountList);
   }
 
   ngOnInit(): void {

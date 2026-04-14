@@ -74,12 +74,6 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  getAccountBalance(accountId: string): Observable<{ balance: number }> {
-    return this.http
-      .get<{ balance: number }>(`${this.baseUrl}/accounts/${accountId}/balance`)
-      .pipe(catchError((err) => this.handleError(err)));
-  }
-
   getTransactions(accountId: string, limit = 20): Observable<Transaction[]> {
     return this.http
       .get<TransactionsResponse>(
@@ -99,7 +93,7 @@ export class ApiService {
 
   generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; otp: string }> {
     return this.http
-      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/transfer/generate-otp`, data)
+      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/transactions/generate-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 
@@ -112,7 +106,7 @@ export class ApiService {
     description?: string;
   }): Observable<{ success: boolean; transactionId: string }> {
     return this.http
-      .post<{ success: boolean; transactionId: string }>(`${this.baseUrl}/transfer/verify-otp`, data)
+      .post<{ success: boolean; transactionId: string }>(`${this.baseUrl}/transactions/verify-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 

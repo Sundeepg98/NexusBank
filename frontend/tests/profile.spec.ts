@@ -25,8 +25,8 @@ test.describe('Profile Page', () => {
   test('should show change password form', async ({ page }) => {
     await page.click('text=Profile');
     await page.click('text=Change Password');
-    await expect(page.locator('input[placeholder*="Current"]')).toBeVisible();
-    await expect(page.locator('input[placeholder*="New"]')).toBeVisible();
+    await expect(page.locator('input[placeholder*="current"]')).toBeVisible();
+    await expect(page.locator('input[placeholder*="new"]').first()).toBeVisible();
   });
 
   test('should logout from profile', async ({ page }) => {

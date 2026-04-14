@@ -28,8 +28,8 @@ export class StatementService {
 
   constructor(private http: HttpClient) {}
 
-  getStatement(data: StatementRequest): Observable<StatementResponse> {
-    return this.http.post<StatementResponse>(`${this.baseUrl}/statements`, data);
+  getStatement(accountId: string, startDate: string, endDate: string): Observable<StatementResponse> {
+    return this.http.get<StatementResponse>(`${this.baseUrl}/accounts/${accountId}/statement?startDate=${startDate}&endDate=${endDate}`);
   }
 
   generateCsv(transactions: Transaction[]): string {

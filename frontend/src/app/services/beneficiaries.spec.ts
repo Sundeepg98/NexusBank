@@ -8,8 +8,8 @@ describe('BeneficiariesService', () => {
   let httpClient: HttpClient;
 
   const mockBeneficiaries: Beneficiary[] = [
-    { id: '1', name: 'John Doe', accountNumber: '1234567890', bankName: 'Bank A', email: 'john@test.com' },
-    { id: '2', name: 'Jane Smith', accountNumber: '0987654321', bankName: 'Bank B' },
+    { id: '1', nickname: 'John Doe', accountNumber: '1234567890', bankName: 'Bank A' },
+    { id: '2', nickname: 'Jane Smith', accountNumber: '0987654321', bankName: 'Bank B' },
   ];
 
   beforeEach(() => {
@@ -37,14 +37,14 @@ describe('BeneficiariesService', () => {
   it('should add beneficiary', () => {
     const newBeneficiary: Beneficiary = {
       id: '3',
-      name: 'Bob Wilson',
+      nickname: 'Bob Wilson',
       accountNumber: '5555555555',
       bankName: 'Bank C',
     };
     vi.mocked(httpClient.post).mockReturnValue(newBeneficiary as any);
 
     service.addBeneficiary({
-      name: 'Bob Wilson',
+      nickname: 'Bob Wilson',
       accountNumber: '5555555555',
       bankName: 'Bank C',
     });
@@ -53,7 +53,7 @@ describe('BeneficiariesService', () => {
     expect(httpClient.post).toHaveBeenCalledWith(
       expect.stringContaining('/beneficiaries'),
       expect.objectContaining({
-        name: 'Bob Wilson',
+        nickname: 'Bob Wilson',
         accountNumber: '5555555555',
         bankName: 'Bank C',
       })
@@ -71,43 +71,18 @@ describe('BeneficiariesService', () => {
   });
 
   it('should return beneficiaries with correct structure', () => {
-    vi.mocked(httpClient.get).mockReturnValue(of(mockBeneficiaries));
+    vi.mocked(httpClient.get).mockReturnValue(of({ beneficiaries: mockBeneficiaries }));
 
     let result: Beneficiary[] = [];
     service.getBeneficiaries().subscribe((data) => {
-      result = data;
+      result = data.beneficiaries;
     });
 
     expect(result).toHaveLength(2);
     expect(result[0]).toHaveProperty('id');
-    expect(result[0]).toHaveProperty('name');
+    expect(result[0]).toHaveProperty('nickname');
     expect(result[0]).toHaveProperty('accountNumber');
     expect(result[0]).toHaveProperty('bankName');
-  });
-
-  it('should add beneficiary with optional email', () => {
-    const newBeneficiary: Beneficiary = {
-      id: '4',
-      name: 'Alice Brown',
-      accountNumber: '7777777777',
-      bankName: 'Bank D',
-      email: 'alice@test.com',
-    };
-    vi.mocked(httpClient.post).mockReturnValue(newBeneficiary as any);
-
-    service.addBeneficiary({
-      name: 'Alice Brown',
-      accountNumber: '7777777777',
-      bankName: 'Bank D',
-      email: 'alice@test.com',
-    });
-
-    expect(httpClient.post).toHaveBeenCalledWith(
-      expect.stringContaining('/beneficiaries'),
-      expect.objectContaining({
-        email: 'alice@test.com',
-      })
-    );
   });
 
   it('should handle get beneficiaries error', () => {
