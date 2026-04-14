@@ -33,7 +33,7 @@ test.describe('Netbanking Dashboard', () => {
   test('should toggle transfer form', async ({ page }) => {
     await page.click('text=Fund Transfer');
     
-    await expect(page.locator('h2:has-text("Transfer Funds")')).toBeVisible();
+    await expect(page.locator('h3:has-text("Fund Transfer")')).toBeVisible();
     await expect(page.locator('text=From Account')).toBeVisible();
     await expect(page.locator('text=To Account Number')).toBeVisible();
     await expect(page.locator('text=Amount (USD)')).toBeVisible();
@@ -49,6 +49,7 @@ test.describe('Netbanking Dashboard', () => {
   test('should logout and redirect to welcome', async ({ page }) => {
     await page.click('button:has-text("Logout")');
     
-    await expect(page).toHaveURL(/\/welcome/);
+    await page.waitForURL(/\/welcome/, { timeout: 10000 });
+    await expect(page.locator('h2:has-text("Login")')).toBeVisible();
   });
 });

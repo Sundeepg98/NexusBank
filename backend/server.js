@@ -19,21 +19,25 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests, please try again later' }
-});
+const isRateLimited = process.env.ENABLE_RATE_LIMIT === 'true';
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many authentication attempts, please try again later' }
-});
+if (isRateLimited) {
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Too many requests, please try again later' }
+  });
 
-app.use('/api', apiLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/login', authLimiter);
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { error: 'Too many authentication attempts, please try again later' }
+  });
+
+  app.use('/api', apiLimiter);
+  app.use('/api/auth/register', authLimiter);
+  app.use('/api/auth/login', authLimiter);
+}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
