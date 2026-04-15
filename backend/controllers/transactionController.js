@@ -83,6 +83,7 @@ const getTransactions = async (req, res) => {
 };
 
 const transfer = async (req, res) => {
+  const session = driver.session();
   try {
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
 
@@ -90,38 +91,34 @@ const transfer = async (req, res) => {
       return res.status(400).json({ error: 'toAccountNumber must be 10-14 digits' });
     }
 
-    const fromResult = await withSession(session =>
-      session.run(
+    await session.executeWrite(async (tx) => {
+      const fromResult = await tx.run(
         `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
          RETURN a`,
         { userId: req.user.userId, accountId: fromAccountId }
-      )
-    );
+      );
 
-    if (fromResult.records.length === 0) {
-      return res.status(404).json({ error: 'Source account not found' });
-    }
+      if (fromResult.records.length === 0) {
+        throw { status: 404, message: 'Source account not found' };
+      }
 
-    const fromAccount = fromResult.records[0].get('a').properties;
-    if (fromAccount.balance < amount) {
-      return res.status(400).json({ error: 'Insufficient funds' });
-    }
+      const fromAccount = fromResult.records[0].get('a').properties;
+      if (fromAccount.balance < amount) {
+        throw { status: 400, message: 'Insufficient funds' };
+      }
 
-    const toResult = await withSession(session =>
-      session.run(
+      const toResult = await tx.run(
         `MATCH (a:Account {accountNumber: $accountNumber}) RETURN a`,
         { accountNumber: toAccountNumber }
-      )
-    );
+      );
 
-    if (toResult.records.length === 0) {
-      return res.status(404).json({ error: 'Destination account not found' });
-    }
+      if (toResult.records.length === 0) {
+        throw { status: 404, message: 'Destination account not found' };
+      }
 
-    const toAccount = toResult.records[0].get('a').properties;
+      const toAccount = toResult.records[0].get('a').properties;
 
-    await withSession(async (session) => {
-      const writeResult = await session.run(
+      await tx.run(
         `MATCH (from:Account {id: $fromId})
          MATCH (to:Account {id: $toId})
          CREATE (t:Transaction {
@@ -139,13 +136,17 @@ const transfer = async (req, res) => {
          RETURN t`,
         { fromId: fromAccountId, toId: toAccount.id, amount: parseFloat(amount), description: sanitizeDescription(description) }
       );
-      return writeResult;
     });
 
     res.json({ message: 'Transfer successful' });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
     logger.error('Transfer error:', error);
     res.status(500).json({ error: 'Transfer failed' });
+  } finally {
+    await session.close();
   }
 };
 
@@ -288,9 +289,12 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    const isBatchTransfer = toAccountNumber === 'BATCH_TRANSFER';
+    const isBatchTransfer = result.data.purpose === 'batch_transfer';
 
     if (isBatchTransfer) {
+      if (toAccountNumber !== 'BATCH_TRANSFER') {
+        return res.status(400).json({ error: 'OTP purpose mismatch for batch transfer' });
+      }
       return res.json({ success: true, batchVerified: true });
     }
 
