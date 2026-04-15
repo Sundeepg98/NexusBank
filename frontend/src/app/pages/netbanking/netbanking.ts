@@ -557,9 +557,11 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
       }
 
       this.otpState.set('loading');
+      const otpIdToVerify = this.otpId();
+      const otpValueToVerify = this.otpValue();
       this.apiService.verifyOTP({
-        otpId: this.otpId(),
-        otp: this.otpValue(),
+        otpId: otpIdToVerify,
+        otp: otpValueToVerify,
         fromAccountId: formValue.fromAccountId,
         toAccountNumber: formValue.toAccountNumber,
         amount: formValue.amount,
@@ -582,10 +584,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.resetTransferState();
           this.loadAccounts();
           this.showTransfer.set(false);
+          this.showToastMessage('Transfer completed successfully!', 'success');
         },
         error: (err: Error) => {
           this.otpState.set('error');
           this.showToastMessage(err.message || 'Transfer failed', 'error');
+          this.otpValue.set('');
         },
       });
     }
