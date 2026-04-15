@@ -11,7 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Test Docker build
+      - name: Check Docker version
+        run: |
+          docker --version
+          docker info || true
+          
+      - name: Build Backend
         run: |
           cd backend
           docker build .
