@@ -548,7 +548,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.otpId.set(response.otpId);
           this.showOTPInput.set(true);
           this.startOTPCountdown(30);
-          this.showToastMessage(`OTP sent! For demo, your OTP is: ${response.otp}`, 'success');
+          this.showToastMessage('OTP sent! Check your phone/email for the code.', 'success');
         },
         error: (err: Error) => {
           this.transferState.set('error');

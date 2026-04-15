@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const neo4j = require('neo4j-driver');
 const { withSession } = require('../config/neo4j');
 const { createOtpEntry, verifyOtpEntry } = require('../config/otp');
+const { validatePassword } = require('../routes/auth');
 
 const getProfile = async (req, res) => {
   try {
@@ -171,17 +172,9 @@ const changePasswordWithOTP = async (req, res) => {
       return res.status(400).json({ error: 'OTP ID and OTP are required' });
     }
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const hasUpperCase = /[A-Z]/.test(newPassword);
-    const hasLowerCase = /[a-z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
     }
 
     const verification = await verifyOtpEntry(otpId, otp);

@@ -209,7 +209,7 @@ const verifyOTP = async (req, res) => {
 
     if (result.data.transferData.fromAccountId !== fromAccountId ||
         result.data.transferData.toAccountNumber !== toAccountNumber ||
-        result.data.transferData.amount != amount) {
+        result.data.transferData.amount !== amount) {
       return res.status(400).json({ error: 'Transfer details mismatch' });
     }
 
