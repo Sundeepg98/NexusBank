@@ -115,4 +115,16 @@ export class ApiService {
       .post<{ message: string }>(`${this.baseUrl}/auth/change-password`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
+
+  requestPasswordChangeOTP(data: { currentPassword: string; newPassword: string }): Observable<{ message: string; otpId: string; otp: string }> {
+    return this.http
+      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/auth/request-password-otp`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  changePasswordWithOTP(data: { otpId: string; otp: string }): Observable<{ message: string }> {
+    return this.http
+      .post<{ message: string }>(`${this.baseUrl}/auth/change-password-with-otp`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
 }

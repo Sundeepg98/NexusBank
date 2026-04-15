@@ -41,6 +41,9 @@ export class Profile implements OnInit {
   toastMessage = signal('');
   toastType = signal<'success' | 'error' | 'warning'>('success');
   showToast = signal(false);
+  otpRequested = signal(false);
+  otpId = signal('');
+  otpError = signal('');
 
   passwordForm: FormGroup = this.fb.group({
     currentPassword: ['', [Validators.required, Validators.minLength(8)]],
@@ -49,7 +52,8 @@ export class Profile implements OnInit {
       Validators.minLength(8),
       Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
     ]],
-    confirmPassword: ['', [Validators.required]]
+    confirmPassword: ['', [Validators.required]],
+    otp: ['']
   }, { validators: this.passwordMatchValidator });
 
   userName = computed(() => {
@@ -90,6 +94,9 @@ export class Profile implements OnInit {
     this.showPasswordForm.set(!this.showPasswordForm());
     this.passwordForm.reset();
     this.changePasswordState.set('idle');
+    this.otpRequested.set(false);
+    this.otpId.set('');
+    this.otpError.set('');
   }
 
   onChangePassword(): void {
@@ -98,10 +105,47 @@ export class Profile implements OnInit {
       return;
     }
 
-    this.changePasswordState.set('loading');
-    const { currentPassword, newPassword } = this.passwordForm.value;
+    const { currentPassword, newPassword, otp } = this.passwordForm.value;
 
-    this.apiService.changePassword({ currentPassword, newPassword })
+    if (!this.otpRequested()) {
+      this.requestOtp(currentPassword, newPassword);
+    } else {
+      this.verifyOtpAndChangePassword(otp);
+    }
+  }
+
+  requestOtp(currentPassword: string, newPassword: string): void {
+    this.changePasswordState.set('loading');
+    this.otpError.set('');
+
+    this.apiService.requestPasswordChangeOTP({ currentPassword, newPassword })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.otpId.set(response.otpId);
+          this.otpRequested.set(true);
+          this.changePasswordState.set('idle');
+          this.showToastMessage(`OTP sent: ${response.otp}`, 'success');
+        },
+        error: (err: Error) => {
+          this.changePasswordState.set('error');
+          this.otpError.set(err.message);
+          this.showToastMessage(err.message || 'Failed to request OTP', 'error');
+        }
+      });
+  }
+
+  verifyOtpAndChangePassword(otp: string): void {
+    if (!otp || otp.length !== 6) {
+      this.otpError.set('OTP must be 6 digits');
+      this.changePasswordState.set('error');
+      return;
+    }
+
+    this.changePasswordState.set('loading');
+    this.otpError.set('');
+
+    this.apiService.changePasswordWithOTP({ otpId: this.otpId(), otp })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {
@@ -109,9 +153,12 @@ export class Profile implements OnInit {
           this.showToastMessage(response.message || 'Password changed successfully', 'success');
           this.passwordForm.reset();
           this.showPasswordForm.set(false);
+          this.otpRequested.set(false);
+          this.otpId.set('');
         },
         error: (err: Error) => {
           this.changePasswordState.set('error');
+          this.otpError.set(err.message);
           this.showToastMessage(err.message || 'Failed to change password', 'error');
         }
       });

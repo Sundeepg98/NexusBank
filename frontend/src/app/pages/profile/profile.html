@@ -113,6 +113,28 @@
               }
             </div>
 
+            @if (otpRequested()) {
+              <div class="form-group">
+                <label for="otp">Enter OTP</label>
+                <input
+                  type="text"
+                  id="otp"
+                  formControlName="otp"
+                  placeholder="Enter 6-digit OTP"
+                  maxlength="6"
+                />
+                @if (hasError('otp', 'required')) {
+                  <span class="error">OTP is required</span>
+                }
+                @if (hasError('otp', 'minlength') || hasError('otp', 'maxlength')) {
+                  <span class="error">OTP must be 6 digits</span>
+                }
+                @if (otpError()) {
+                  <span class="error">{{ otpError() }}</span>
+                }
+              </div>
+            }
+
             <div class="form-actions">
               <button
                 type="submit"
@@ -120,9 +142,9 @@
                 [disabled]="changePasswordState() === 'loading'"
               >
                 @if (changePasswordState() === 'loading') {
-                  <span class="spinner"></span> Changing...
+                  <span class="spinner"></span> {{ otpRequested() ? 'Verifying...' : 'Requesting OTP...' }}
                 } @else {
-                  Change Password
+                  {{ otpRequested() ? 'Change Password' : 'Request OTP' }}
                 }
               </button>
               <button
