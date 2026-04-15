@@ -53,7 +53,7 @@ export class Profile implements OnInit {
     newPassword: ['', [
       Validators.required,
       Validators.minLength(8),
-      Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]+$/)
+      Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/)
     ]],
     confirmPassword: ['', [Validators.required]],
     otp: ['']
@@ -134,7 +134,7 @@ export class Profile implements OnInit {
           this.otpId.set(response.otpId);
           this.otpRequested.set(true);
           this.changePasswordState.set('idle');
-          this.showToastMessage(`OTP sent: ${response.otp}`, 'success');
+          this.showToastMessage(`OTP sent! Check your phone/email for the code.`, 'success');
         },
         error: (err: Error) => {
           this.changePasswordState.set('error');

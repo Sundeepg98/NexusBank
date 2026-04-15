@@ -34,9 +34,9 @@ export class Register {
       username: ['', [Validators.required, Validators.minLength(3)]],
       phone: ['', [Validators.pattern(/^\+?[\d\s-]{10,}$/)]],
       password: ['', [
-        Validators.required, 
+        Validators.required,
         Validators.minLength(8),
-        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/)
       ]],
       confirmPassword: ['', Validators.required],
     }, { validators: this.passwordMatchValidator });

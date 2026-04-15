@@ -61,7 +61,7 @@ const validatePassword = (password) => {
   const hasUpperCase = /[A-Z]/.test(password);
   const hasLowerCase = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
-  const hasSpecialChar = /[@$!%*?&]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
     return { valid: false, error: 'Password must contain uppercase, lowercase, number, and special character' };
   }
@@ -296,20 +296,7 @@ router.post('/change-password', authMiddleware, async (req, res) => {
 
 router.post('/request-password-otp', authMiddleware, async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const hasUpperCase = /[A-Z]/.test(newPassword);
-    const hasLowerCase = /[a-z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
-    }
+    const { currentPassword } = req.body;
 
     const result = await withSession(session =>
       session.run('MATCH (u:User {id: $userId}) RETURN u', { userId: req.user.userId })
@@ -328,8 +315,7 @@ router.post('/request-password-otp', authMiddleware, async (req, res) => {
 
     const { otpId } = await createOtpEntry({
       purpose: 'password_change',
-      userId: req.user.userId,
-      newPassword: newPassword
+      userId: req.user.userId
     });
 
     res.json({ message: 'OTP sent', otpId });
@@ -420,10 +406,15 @@ router.post('/reset-password', async (req, res) => {
 
 router.post('/change-password-with-otp', authMiddleware, async (req, res) => {
   try {
-    const { otpId, otp } = req.body;
+    const { otpId, otp, newPassword } = req.body;
 
-    if (!otpId || !otp) {
-      return res.status(400).json({ error: 'OTP ID and OTP are required' });
+    if (!otpId || !otp || !newPassword) {
+      return res.status(400).json({ error: 'OTP ID, OTP, and newPassword are required' });
+    }
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
     }
 
     const verification = await verifyOtpEntry(otpId, otp);
@@ -440,7 +431,7 @@ router.post('/change-password-with-otp', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'OTP does not match user' });
     }
 
-    const hashedNewPassword = await bcrypt.hash(verification.data.newPassword, 10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     await withSession(session =>
       session.run('MATCH (u:User {id: $userId}) SET u.password = $newPassword', { userId: req.user.userId, newPassword: hashedNewPassword })
