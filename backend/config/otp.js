@@ -11,9 +11,9 @@ const generateOTP = () => {
 
 const sendOTPNotification = (otp, channel = 'mock') => {
   if (logger?.info) {
-    logger.info(`[OTP Notification] Channel: ${channel} | OTP: ${otp}`);
+    logger.info(`[OTP Notification] Channel: ${channel} | OTP sent`);
   } else {
-    console.log(`[OTP Notification] Channel: ${channel} | OTP: ${otp}`);
+    console.log(`[OTP Notification] Channel: ${channel} | OTP sent`);
   }
 };
 
