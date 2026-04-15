@@ -296,7 +296,7 @@ const verifyOTP = async (req, res) => {
       if (toAccountNumber !== 'BATCH_TRANSFER') {
         return res.status(400).json({ error: 'OTP purpose mismatch for batch transfer' });
       }
-      return res.json({ success: true, batchVerified: true });
+      return res.json({ success: true, batchVerified: true, transactionId: null });
     }
 
     if (result.data.transferData.fromAccountId !== fromAccountId ||
