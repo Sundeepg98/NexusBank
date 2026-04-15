@@ -169,6 +169,7 @@ const createOTP = async (req, res) => {
     }
 
     const { otpId, expiresAt } = await createOtpEntry({
+      purpose: isBatchTransfer ? 'batch_transfer' : 'transfer',
       transferData: { fromAccountId, toAccountNumber, amount: amount || 0 },
       userId: req.user.userId
     });
