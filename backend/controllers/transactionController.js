@@ -179,6 +179,93 @@ const createOTP = async (req, res) => {
   }
 };
 
+const batchTransfer = async (req, res) => {
+  const session = driver.session();
+  const tx = session.beginTransaction();
+
+  try {
+    const { fromAccountId, transfers } = req.body;
+
+    if (!fromAccountId || !Array.isArray(transfers) || transfers.length === 0) {
+      await tx.rollback();
+      return res.status(400).json({ error: 'fromAccountId and transfers array are required' });
+    }
+
+    const accountResult = await tx.run(
+      `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
+       RETURN a`,
+      { userId: req.user.userId, accountId: fromAccountId }
+    );
+
+    if (accountResult.records.length === 0) {
+      await tx.rollback();
+      return res.status(404).json({ error: 'Source account not found' });
+    }
+
+    const fromAccount = accountResult.records[0].get('a').properties;
+    const totalAmount = transfers.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+    if (fromAccount.balance < totalAmount) {
+      await tx.rollback();
+      return res.status(400).json({ error: 'Insufficient funds for batch transfer' });
+    }
+
+    const transferQueries = [];
+    for (const transfer of transfers) {
+      const toResult = await tx.run(
+        `MATCH (a:Account {accountNumber: $accountNumber}) RETURN a`,
+        { accountNumber: transfer.toAccountNumber }
+      );
+
+      if (toResult.records.length === 0) {
+        await tx.rollback();
+        return res.status(404).json({ error: `Destination account ${transfer.toAccountNumber} not found` });
+      }
+
+      const toAccount = toResult.records[0].get('a').properties;
+      const txnId = crypto.randomUUID();
+
+      await tx.run(
+        `MATCH (from:Account {id: $fromId})
+         MATCH (to:Account {id: $toId})
+         CREATE (t:Transaction {
+           id: $txnId,
+           amount: $amount,
+           description: $description,
+           timestamp: datetime()
+         })
+         CREATE (from)-[:SENT]->(t)-[:RECEIVED]->(to)
+         WITH t
+         MATCH (from:Account {id: $fromId})
+         SET from.balance = from.balance - $amount
+         MATCH (to:Account {id: $toId})
+         SET to.balance = to.balance + $amount`,
+        {
+          fromId: fromAccountId,
+          toId: toAccount.id,
+          txnId,
+          amount: parseFloat(transfer.amount),
+          description: sanitizeDescription(transfer.description)
+        }
+      );
+      transferQueries.push({ txnId, toAccountNumber: transfer.toAccountNumber });
+    }
+
+    await tx.commit();
+    res.json({
+      success: true,
+      message: `Successfully executed ${transfers.length} transfers`,
+      transfers: transferQueries
+    });
+  } catch (error) {
+    await tx.rollback();
+    logger.error('Batch transfer error:', error);
+    res.status(500).json({ error: 'Batch transfer failed - all transfers rolled back' });
+  } finally {
+    await session.close();
+  }
+};
+
 const verifyOTP = async (req, res) => {
   try {
     const { otpId, otp, fromAccountId, toAccountNumber, amount, description } = req.body;
@@ -273,4 +360,4 @@ const verifyOTP = async (req, res) => {
   }
 };
 
-module.exports = { getTransactions, transfer, createOTP, verifyOTP };
+module.exports = { getTransactions, transfer, createOTP, verifyOTP, batchTransfer };

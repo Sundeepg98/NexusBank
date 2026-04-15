@@ -92,6 +92,10 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
     }
 
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
     const result = await withSession(session =>
       session.run('MATCH (u:User {id: $userId}) RETURN u', { userId: req.user.userId })
     );

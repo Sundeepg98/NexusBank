@@ -68,6 +68,16 @@ const otpLimiter = rateLimit({
 
 app.use('/api/transactions/generate-otp', otpLimiter);
 
+const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many OTP verification attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/transactions/verify-otp', otpVerifyLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/transactions', transactionRoutes);

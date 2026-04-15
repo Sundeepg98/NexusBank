@@ -109,6 +109,12 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
+  batchTransfer(data: { fromAccountId: string; transfers: { toAccountNumber: string; amount: number; description: string }[] }): Observable<{ success: boolean; message: string }> {
+    return this.http
+      .post<{ success: boolean; message: string }>(`${this.baseUrl}/transactions/batch-transfer`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
   generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; expiresIn: number }> {
     return this.http
       .post<{ message: string; otpId: string; expiresIn: number }>(`${this.baseUrl}/transactions/generate-otp`, data)
@@ -167,6 +173,14 @@ export class ApiService {
   updateAvatar(avatar: string): Observable<{ message: string; user: User }> {
     return this.http
       .put<{ message: string; user: User }>(`${this.baseUrl}/profile`, { avatar })
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  downloadStatement(accountId: string, format: 'csv' | 'pdf' = 'csv'): Observable<Blob> {
+    return this.http
+      .get(`${this.baseUrl}/accounts/${accountId}/statement?format=${format}`, {
+        responseType: 'blob',
+      })
       .pipe(catchError((err) => this.handleError(err)));
   }
 }

@@ -87,6 +87,10 @@ const getAccountStatement = async (req, res) => {
     const { id } = req.params;
     const { format = 'json', from, to } = req.query;
 
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     let dateFilter = '';
     if (from && to) {
       dateFilter = 'AND t.timestamp >= datetime($from) AND t.timestamp <= datetime($to)';
@@ -96,25 +100,26 @@ const getAccountStatement = async (req, res) => {
       dateFilter = 'AND t.timestamp <= datetime($to)';
     }
 
-    const result = await withSession(session =>
-      session.run(
-        `MATCH (a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
-         WHERE true ${dateFilter}
-         RETURN t ORDER BY t.timestamp DESC`,
-        { accountId: id, from, to }
-      )
-    );
-
     const accountResult = await withSession(session =>
       session.run(
-        `MATCH (a:Account {id: $accountId}) RETURN a`,
-        { accountId: id }
+        `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
+         RETURN a`,
+        { userId: req.user.userId, accountId: id }
       )
     );
 
     if (accountResult.records.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(403).json({ error: 'Forbidden' });
     }
+
+    const result = await withSession(session =>
+      session.run(
+        `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
+         WHERE true ${dateFilter}
+         RETURN t ORDER BY t.timestamp DESC`,
+        { userId: req.user.userId, accountId: id, from, to }
+      )
+    );
 
     const account = accountResult.records[0].get('a').properties;
     const transactions = result.records.map(r => {

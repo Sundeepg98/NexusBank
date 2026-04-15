@@ -288,7 +288,10 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   downloadStatement(): void {
     const accountId = this.selectedAccount()?.id;
     if (!accountId) return;
-    window.open(`/api/accounts/${accountId}/statement?format=csv`, '_blank');
+    this.apiService.downloadStatement(accountId, 'csv').subscribe(blob => {
+      const url = window.URL.createObjectURL(blob);
+      window.open(url);
+    });
   }
 
   private initTransferForm(): void {
@@ -467,37 +470,29 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private executeBatchTransfers(formValue: any, recipientArray: { toAccountNumber: string; amount: number; description: string }[]): void {
-    let completed = 0;
-    let hasError = false;
-    const totalRecipients = recipientArray.length;
-
-    recipientArray.forEach((recipient) => {
-      this.apiService.transfer({
-        fromAccountId: formValue.fromAccountId,
-        toAccountNumber: recipient.toAccountNumber,
-        amount: recipient.amount,
-        description: recipient.description || 'Batch Transfer',
-      })
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          completed++;
-          if (completed === totalRecipients && !hasError) {
-            this.transferState.set('success');
-            this.showToastMessage(`Successfully transferred to ${completed} recipients!`, 'success');
-            this.resetBatchTransferState();
-            this.initBatchTransferForm();
-            this.loadAccounts();
-            this.showBatchTransfer.set(false);
-            this.showBatchOTPInput.set(false);
-          }
-        },
-        error: (err: Error) => {
-          hasError = true;
-          this.transferState.set('error');
-          this.showToastMessage(err.message || 'Batch transfer failed', 'error');
-        },
-      });
+    this.apiService.batchTransfer({
+      fromAccountId: formValue.fromAccountId,
+      transfers: recipientArray.map(r => ({
+        toAccountNumber: r.toAccountNumber,
+        amount: r.amount,
+        description: r.description || 'Batch Transfer',
+      })),
+    })
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (result) => {
+        this.transferState.set('success');
+        this.showToastMessage(result.message || `Successfully transferred to ${recipientArray.length} recipients!`, 'success');
+        this.resetBatchTransferState();
+        this.initBatchTransferForm();
+        this.loadAccounts();
+        this.showBatchTransfer.set(false);
+        this.showBatchOTPInput.set(false);
+      },
+      error: (err: Error) => {
+        this.transferState.set('error');
+        this.showToastMessage(err.message || 'Batch transfer failed - all transfers were rolled back', 'error');
+      },
     });
   }
 
