@@ -45,6 +45,7 @@ export class Profile implements OnInit {
   otpRequested = signal(false);
   otpId = signal('');
   otpError = signal('');
+  newPassword = signal('');
   showDeleteModal = signal(false);
   deleteAccountState = signal<DeleteAccountState>('idle');
 
@@ -126,6 +127,7 @@ export class Profile implements OnInit {
   requestOtp(currentPassword: string, newPassword: string): void {
     this.changePasswordState.set('loading');
     this.otpError.set('');
+    this.newPassword.set(newPassword);
 
     this.apiService.requestPasswordChangeOTP({ currentPassword, newPassword })
       .pipe(takeUntil(this.destroy$))
@@ -154,7 +156,7 @@ export class Profile implements OnInit {
     this.changePasswordState.set('loading');
     this.otpError.set('');
 
-    this.apiService.changePasswordWithOTP({ otpId: this.otpId(), otp })
+    this.apiService.changePasswordWithOTP({ otpId: this.otpId(), otp, newPassword: this.newPassword() })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {

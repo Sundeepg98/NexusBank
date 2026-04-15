@@ -68,9 +68,9 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  getProfile(): Observable<{ user: User; accounts: Account[] }> {
+  getProfile(): Observable<{ user: User }> {
     return this.http
-      .get<{ user: User; accounts: Account[] }>(`${this.baseUrl}/profile`)
+      .get<{ user: User }>(`${this.baseUrl}/profile`)
       .pipe(catchError((err) => this.handleError(err)));
   }
 
@@ -140,7 +140,7 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  changePasswordWithOTP(data: { otpId: string; otp: string }): Observable<{ message: string }> {
+  changePasswordWithOTP(data: { otpId: string; otp: string; newPassword: string }): Observable<{ message: string }> {
     return this.http
       .post<{ message: string }>(`${this.baseUrl}/auth/change-password-with-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
