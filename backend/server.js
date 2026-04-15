@@ -8,6 +8,7 @@ dotenv.config({ path: require('path').join(__dirname, '.env') });
 
 const logger = require('./config/logger');
 const { driver } = require('./config/neo4j');
+const { sanitizeBody } = require('./middleware/sanitize');
 
 const authRoutes = require('./routes/auth');
 const accountRoutes = require('./routes/accounts');
@@ -33,6 +34,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '10kb' }));
+app.use(sanitizeBody);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

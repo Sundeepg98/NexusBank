@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { withSession } = require('./neo4j');
+const logger = require('./logger')?.logger;
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
@@ -9,7 +10,11 @@ const generateOTP = () => {
 };
 
 const sendOTPNotification = (otp, channel = 'mock') => {
-  console.log(`[OTP Notification] Channel: ${channel} | OTP: ${otp}`);
+  if (logger?.info) {
+    logger.info(`[OTP Notification] Channel: ${channel} | OTP: ${otp}`);
+  } else {
+    console.log(`[OTP Notification] Channel: ${channel} | OTP: ${otp}`);
+  }
 };
 
 const cleanupExpiredOTPs = async () => {

@@ -109,9 +109,9 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; otp: string }> {
+  generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; expiresIn: number }> {
     return this.http
-      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/transactions/generate-otp`, data)
+      .post<{ message: string; otpId: string; expiresIn: number }>(`${this.baseUrl}/transactions/generate-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 
@@ -134,9 +134,9 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  requestPasswordChangeOTP(data: { currentPassword: string; newPassword: string }): Observable<{ message: string; otpId: string; otp: string }> {
+  requestPasswordChangeOTP(data: { currentPassword: string; newPassword: string }): Observable<{ message: string; otpId: string }> {
     return this.http
-      .post<{ message: string; otpId: string; otp: string }>(`${this.baseUrl}/auth/request-password-otp`, data)
+      .post<{ message: string; otpId: string }>(`${this.baseUrl}/auth/request-password-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 

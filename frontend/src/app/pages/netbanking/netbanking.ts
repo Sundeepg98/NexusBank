@@ -244,7 +244,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
         this.otpId.set(response.otpId);
         this.startOTPCountdown(30);
         this.otpState.set('idle');
-        this.showToastMessage(`OTP resent! For demo, your OTP is: ${response.otp}`, 'success');
+        this.showToastMessage(`OTP resent! Check your phone/email for the code.`, 'success');
       },
       error: (err: Error) => {
         this.otpState.set('error');
@@ -270,7 +270,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
         this.batchOTPId.set(response.otpId);
         this.startBatchOTPCountdown(30);
         this.batchOTPState.set('idle');
-        this.showToastMessage(`OTP resent! For demo, your OTP is: ${response.otp}`, 'success');
+        this.showToastMessage(`OTP resent! Check your phone/email for the code.`, 'success');
       },
       error: (err: Error) => {
         this.batchOTPState.set('error');
@@ -420,7 +420,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.batchOTPId.set(response.otpId);
           this.showBatchOTPInput.set(true);
           this.startBatchOTPCountdown(30);
-          this.showToastMessage(`OTP sent for batch transfer! For demo, your OTP is: ${response.otp}`, 'success');
+          this.showToastMessage(`OTP sent for batch transfer! Check your phone/email for the code.`, 'success');
         },
         error: (err: Error) => {
           this.transferState.set('error');

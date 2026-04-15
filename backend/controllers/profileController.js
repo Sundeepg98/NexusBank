@@ -153,8 +153,7 @@ const requestPasswordChangeOTP = async (req, res) => {
 
     const { otpId } = await createOtpEntry({
       purpose: 'password_change',
-      userId: req.user.userId,
-      newPassword: newPassword
+      userId: req.user.userId
     });
 
     res.json({ message: 'OTP sent', otpId });
@@ -166,10 +165,23 @@ const requestPasswordChangeOTP = async (req, res) => {
 
 const changePasswordWithOTP = async (req, res) => {
   try {
-    const { otpId, otp, currentPassword, newPassword } = req.body;
+    const { otpId, otp, newPassword } = req.body;
 
     if (!otpId || !otp) {
       return res.status(400).json({ error: 'OTP ID and OTP are required' });
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
     }
 
     const verification = await verifyOtpEntry(otpId, otp);
@@ -186,7 +198,7 @@ const changePasswordWithOTP = async (req, res) => {
       return res.status(403).json({ error: 'OTP does not match user' });
     }
 
-    const hashedNewPassword = await bcrypt.hash(verification.data.newPassword, 10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     await withSession(session =>
       session.run('MATCH (u:User {id: $userId}) SET u.password = $newPassword', { userId: req.user.userId, newPassword: hashedNewPassword })

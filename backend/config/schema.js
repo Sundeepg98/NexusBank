@@ -11,7 +11,7 @@ async function setupIndexes() {
     try {
       await withSession(session =>
         session.run(
-          `CREATE INDEX ${index.unique ? 'FOR' : 'FOR'} (${index.label}:${index.label}) ON (${index.label}.${index.property})`,
+          `CREATE INDEX ${index.label}_${index.property}_index IF NOT EXISTS FOR (n:${index.label}) ON (n.${index.property})`,
           {}
         )
       );
