@@ -297,7 +297,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   private initTransferForm(): void {
     this.transferForm = this.fb.group({
       fromAccountId: ['', Validators.required],
-      toAccountNumber: ['', [Validators.required, Validators.pattern(/^\d{10,14}$/)]],
+      toAccountNumber: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9-]{6,20}$/)]],
       amount: [null, [Validators.required, Validators.min(1), Validators.max(1000000)]],
       description: [''],
     });

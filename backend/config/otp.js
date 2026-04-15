@@ -9,11 +9,12 @@ const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-const sendOTPNotification = (otp, channel = 'mock') => {
+const sendOTPNotification = (otp, channel = 'mock', metadata = {}) => {
+  const otpLog = `[OTP] ${otp} | ${metadata.purpose || 'general'} | ${metadata.email || metadata.userId || 'unknown'}`;
   if (logger?.info) {
-    logger.info(`[OTP Notification] Channel: ${channel} | OTP sent`);
+    logger.info(otpLog);
   } else {
-    console.log(`[OTP Notification] Channel: ${channel} | OTP sent`);
+    console.log(otpLog);
   }
 };
 
@@ -99,7 +100,7 @@ const createOtpEntry = async (data) => {
     )
   );
 
-  sendOTPNotification(otp, 'mock');
+  sendOTPNotification(otp, 'mock', { purpose: data.purpose, email: data.email, userId: data.userId });
   return { otpId, otp, expiresAt };
 };
 

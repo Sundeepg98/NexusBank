@@ -87,8 +87,8 @@ const transfer = async (req, res) => {
   try {
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
 
-    if (!/^\d{10,14}$/.test(toAccountNumber)) {
-      return res.status(400).json({ error: 'toAccountNumber must be 10-14 digits' });
+    if (!/^[A-Za-z0-9-]{6,20}$/.test(toAccountNumber)) {
+      return res.status(400).json({ error: 'toAccountNumber must be 6-20 alphanumeric characters' });
     }
 
     await session.executeWrite(async (tx) => {
@@ -160,8 +160,8 @@ const createOTP = async (req, res) => {
 
     const isBatchTransfer = toAccountNumber === 'BATCH_TRANSFER';
 
-    if (!isBatchTransfer && !/^\d{10,14}$/.test(toAccountNumber)) {
-      return res.status(400).json({ error: 'toAccountNumber must be 10-14 digits' });
+    if (!isBatchTransfer && !/^[A-Za-z0-9-]{6,20}$/.test(toAccountNumber)) {
+      return res.status(400).json({ error: 'toAccountNumber must be 6-20 alphanumeric characters' });
     }
 
     if (!isBatchTransfer && !amount) {
