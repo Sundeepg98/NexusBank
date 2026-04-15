@@ -15,8 +15,21 @@
     </div>
   } @else if (user(); as userData) {
     <div class="profile-header">
-      <h1>Welcome, {{ userName() }}</h1>
-      <button class="btn btn-secondary" (click)="logout()">Logout</button>
+      <div class="profile-avatar-section">
+        @if (userData.avatar) {
+          <img [src]="userData.avatar" alt="Profile Avatar" class="profile-avatar" />
+        } @else {
+          <div class="avatar-placeholder">{{ userInitials() }}</div>
+        }
+        <label class="avatar-upload-btn">
+          <input type="file" accept="image/*" (change)="onAvatarSelected($event)" hidden />
+          <span>Change Avatar</span>
+        </label>
+      </div>
+      <div class="profile-header-text">
+        <h1>Welcome, {{ userName() }}</h1>
+        <button class="btn btn-secondary" (click)="logout()">Logout</button>
+      </div>
     </div>
 
     <div class="profile-content">
@@ -162,6 +175,41 @@
           </form>
         }
       </div>
+
+      <div class="card danger-card">
+        <h2>Danger Zone</h2>
+        <p>Once you delete your account, there is no going back. Please be certain.</p>
+        <button class="btn btn-danger" (click)="openDeleteModal()">Delete Account</button>
+      </div>
     </div>
   }
 </div>
+
+@if (showDeleteModal()) {
+  <div class="modal-overlay" (click)="closeDeleteModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h2>Delete Account</h2>
+      <p>Are you sure you want to delete your account? This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button
+          class="btn btn-secondary"
+          (click)="closeDeleteModal()"
+          [disabled]="deleteAccountState() === 'loading'"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn btn-danger"
+          (click)="confirmDelete()"
+          [disabled]="deleteAccountState() === 'loading'"
+        >
+          @if (deleteAccountState() === 'loading') {
+            <span class="spinner"></span> Deleting...
+          } @else {
+            Delete
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

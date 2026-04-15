@@ -36,6 +36,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/register/register').then(m => m.Register)
   },
   {
+    path: 'forgot-password',
+    loadComponent: () => import('./pages/forgot-password/forgot-password').then(m => m.ForgotPassword)
+  },
+  {
     path: 'services',
     loadComponent: () => import('./pages/services/services').then(m => m.Services),
     canActivate: [authGuard]
@@ -51,6 +55,11 @@ export const routes: Routes = [
   {
     path: 'profile',
     loadComponent: () => import('./pages/profile/profile').then(m => m.Profile),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'beneficiaries',
+    loadComponent: () => import('./pages/beneficiaries/beneficiaries').then(m => m.Beneficiaries),
     canActivate: [authGuard]
   },
   {

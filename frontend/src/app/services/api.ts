@@ -13,6 +13,23 @@ import {
 } from '../models';
 import { environment } from '../../environments/environment';
 
+export interface LoginResponse {
+  message: string;
+  token: string;
+  refreshToken: string;
+  refreshTokenExpiry: number;
+  user: User;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  otpId: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -35,6 +52,7 @@ export class ApiService {
     username: string;
     email: string;
     password: string;
+    confirmPassword: string;
     firstName: string;
     lastName: string;
     phone?: string;
@@ -44,9 +62,9 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  login(email: string, password: string): Observable<AuthResponse> {
+  login(email: string, password: string): Observable<LoginResponse> {
     return this.http
-      .post<AuthResponse>(`${this.baseUrl}/auth/login`, { email, password })
+      .post<LoginResponse>(`${this.baseUrl}/auth/login`, { email, password })
       .pipe(catchError((err) => this.handleError(err)));
   }
 
@@ -125,6 +143,30 @@ export class ApiService {
   changePasswordWithOTP(data: { otpId: string; otp: string }): Observable<{ message: string }> {
     return this.http
       .post<{ message: string }>(`${this.baseUrl}/auth/change-password-with-otp`, data)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  forgotPassword(email: string): Observable<ForgotPasswordResponse> {
+    return this.http
+      .post<ForgotPasswordResponse>(`${this.baseUrl}/auth/forgot-password`, { email })
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  resetPassword(email: string, otpId: string, otp: string, newPassword: string): Observable<ResetPasswordResponse> {
+    return this.http
+      .post<ResetPasswordResponse>(`${this.baseUrl}/auth/reset-password`, { email, otpId, otp, newPassword })
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  deleteProfile(): Observable<{ message: string }> {
+    return this.http
+      .delete<{ message: string }>(`${this.baseUrl}/profile/user`)
+      .pipe(catchError((err) => this.handleError(err)));
+  }
+
+  updateAvatar(avatar: string): Observable<{ message: string; user: User }> {
+    return this.http
+      .put<{ message: string; user: User }>(`${this.baseUrl}/profile`, { avatar })
       .pipe(catchError((err) => this.handleError(err)));
   }
 }

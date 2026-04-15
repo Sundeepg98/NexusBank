@@ -1,6 +1,14 @@
 const neo4j = require('neo4j-driver');
 const crypto = require('crypto');
+const xss = require('xss');
+const logger = require('../config/logger');
+const { createOtpEntry, verifyOtpEntry } = require('../config/otp');
 const { driver } = require('../config/neo4j');
+
+const sanitizeDescription = (description) => {
+  if (!description) return 'Transfer';
+  return xss(description.trim());
+};
 
 const withSession = async (callback) => {
   const session = driver.session();
@@ -9,12 +17,6 @@ const withSession = async (callback) => {
   } finally {
     await session.close();
   }
-};
-
-const otpStore = new Map();
-
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 const getTransactions = async (req, res) => {
@@ -75,7 +77,7 @@ const getTransactions = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get transactions error:', error);
+    logger.error('Get transactions error:', error);
     res.status(500).json({ error: 'Failed to get transactions' });
   }
 };
@@ -83,6 +85,10 @@ const getTransactions = async (req, res) => {
 const transfer = async (req, res) => {
   try {
     const { fromAccountId, toAccountNumber, amount, description } = req.body;
+
+    if (!/^\d{10,14}$/.test(toAccountNumber)) {
+      return res.status(400).json({ error: 'toAccountNumber must be 10-14 digits' });
+    }
 
     const fromResult = await withSession(session =>
       session.run(
@@ -131,14 +137,14 @@ const transfer = async (req, res) => {
          MATCH (to:Account {id: $toId})
          SET to.balance = to.balance + $amount
          RETURN t`,
-        { fromId: fromAccountId, toId: toAccount.id, amount: parseFloat(amount), description: description || 'Transfer' }
+        { fromId: fromAccountId, toId: toAccount.id, amount: parseFloat(amount), description: sanitizeDescription(description) }
       );
       return writeResult;
     });
 
     res.json({ message: 'Transfer successful' });
   } catch (error) {
-    console.error('Transfer error:', error);
+    logger.error('Transfer error:', error);
     res.status(500).json({ error: 'Transfer failed' });
   }
 };
@@ -147,23 +153,28 @@ const createOTP = async (req, res) => {
   try {
     const { fromAccountId, toAccountNumber, amount } = req.body;
 
-    if (!fromAccountId || !toAccountNumber || !amount) {
-      return res.status(400).json({ error: 'fromAccountId, toAccountNumber, and amount are required' });
+    if (!fromAccountId || !toAccountNumber) {
+      return res.status(400).json({ error: 'fromAccountId and toAccountNumber are required' });
     }
 
-    const otp = generateOTP();
-    const otpId = crypto.randomUUID();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
+    const isBatchTransfer = toAccountNumber === 'BATCH_TRANSFER';
 
-    otpStore.set(otpId, {
-      otp,
-      expiresAt,
-      transferData: { fromAccountId, toAccountNumber, amount }
+    if (!isBatchTransfer && !/^\d{10,14}$/.test(toAccountNumber)) {
+      return res.status(400).json({ error: 'toAccountNumber must be 10-14 digits' });
+    }
+
+    if (!isBatchTransfer && !amount) {
+      return res.status(400).json({ error: 'amount is required' });
+    }
+
+    const { otpId, expiresAt } = await createOtpEntry({
+      transferData: { fromAccountId, toAccountNumber, amount: amount || 0 },
+      userId: req.user.userId
     });
 
-    res.json({ message: 'OTP sent', otpId, otp });
+    res.json({ message: 'OTP sent', otpId, expiresIn: 300 });
   } catch (error) {
-    console.error('Generate OTP error:', error);
+    logger.error('Generate OTP error:', error);
     res.status(500).json({ error: 'Failed to generate OTP' });
   }
 };
@@ -172,24 +183,35 @@ const verifyOTP = async (req, res) => {
   try {
     const { otpId, otp, fromAccountId, toAccountNumber, amount, description } = req.body;
 
-    const stored = otpStore.get(otpId);
+    const result = await verifyOtpEntry(otpId, otp);
 
-    if (!stored || stored.expiresAt < Date.now()) {
-      otpStore.delete(otpId);
-      return res.status(400).json({ error: 'OTP expired or invalid' });
+    if (!result.valid) {
+      if (result.reason === 'locked_out') {
+        return res.status(429).json({
+          error: 'Too many failed attempts. OTP has been locked.',
+          attempts: result.attempts
+        });
+      }
+      if (result.reason === 'expired') {
+        return res.status(400).json({ error: 'OTP expired or invalid' });
+      }
+      return res.status(400).json({
+        error: 'Invalid OTP',
+        attempts: result.attempts || 1
+      });
     }
 
-    if (stored.otp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+    const isBatchTransfer = toAccountNumber === 'BATCH_TRANSFER';
+
+    if (isBatchTransfer) {
+      return res.json({ success: true, batchVerified: true });
     }
 
-    if (stored.transferData.fromAccountId !== fromAccountId ||
-        stored.transferData.toAccountNumber !== toAccountNumber ||
-        stored.transferData.amount != amount) {
+    if (result.data.transferData.fromAccountId !== fromAccountId ||
+        result.data.transferData.toAccountNumber !== toAccountNumber ||
+        result.data.transferData.amount != amount) {
       return res.status(400).json({ error: 'Transfer details mismatch' });
     }
-
-    otpStore.delete(otpId);
 
     const fromResult = await withSession(session =>
       session.run(
@@ -240,13 +262,13 @@ const verifyOTP = async (req, res) => {
          MATCH (to:Account {id: $toId})
          SET to.balance = to.balance + $amount
          RETURN t`,
-        { fromId: fromAccountId, toId: toAccount.id, txnId, amount: parseFloat(amount), description: description || 'Transfer' }
+        { fromId: fromAccountId, toId: toAccount.id, txnId, amount: parseFloat(amount), description: sanitizeDescription(description) }
       );
     });
 
     res.json({ success: true, transactionId: txnId });
   } catch (error) {
-    console.error('Verify OTP error:', error);
+    logger.error('Verify OTP error:', error);
     res.status(500).json({ error: 'Transfer failed' });
   }
 };

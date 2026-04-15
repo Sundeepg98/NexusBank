@@ -96,6 +96,13 @@
  *                   type: string
  *                 token:
  *                   type: string
+ *                   description: Access token (15 min expiry)
+ *                 refreshToken:
+ *                   type: string
+ *                   description: Refresh token (7 days expiry)
+ *                 refreshTokenExpiry:
+ *                   type: integer
+ *                   description: Refresh token expiry timestamp
  *                 user:
  *                   type: object
  *                   properties:
@@ -123,11 +130,136 @@
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: Refresh token to blacklist
  *     responses:
  *       200:
  *         description: Logged out successfully
  *       401:
  *         description: Unauthorized
+ */
+
+/**
+ * @openapi
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                   description: New access token
+ *                 refreshToken:
+ *                   type: string
+ *                   description: New refresh token
+ *                 refreshTokenExpiry:
+ *                   type: integer
+ *                   description: Refresh token expiry timestamp
+ *       401:
+ *         description: Invalid or expired refresh token
+ *       500:
+ *         description: Failed to refresh token
+ */
+
+/**
+ * @openapi
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset OTP
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 otpId:
+ *                   type: string
+ *                   description: OTP ID for verification
+ *       404:
+ *         description: User not found with this email
+ *       500:
+ *         description: Failed to process request
+ */
+
+/**
+ * @openapi
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with OTP
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, otpId, otp, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               otpId:
+ *                 type: string
+ *               otp:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid input or OTP
+ *       500:
+ *         description: Failed to reset password
  */
 
 /**
@@ -548,6 +680,9 @@
  *               properties:
  *                 message:
  *                   type: string
+ *                 otpId:
+ *                   type: string
+ *                   description: OTP identifier for verification
  *                 expiresIn:
  *                   type: integer
  *                   description: OTP expiry in seconds
@@ -555,6 +690,8 @@
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
+ *       429:
+ *         description: Too many OTP requests
  *       500:
  *         description: Failed to generate OTP
  */
@@ -593,6 +730,8 @@
  *         description: Invalid or expired OTP
  *       401:
  *         description: Unauthorized
+ *       429:
+ *         description: Too many failed attempts or OTP locked out
  *       500:
  *         description: Verification failed
  */

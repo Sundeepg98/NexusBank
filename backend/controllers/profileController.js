@@ -22,6 +22,7 @@ const getProfile = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        avatar: user.avatar,
         createdAt: user.createdAt ? user.createdAt.toString() : null
       }
     });
@@ -33,13 +34,20 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, phone, avatar } = req.body;
+
+    let query = 'MATCH (u:User {id: $userId}) SET u.firstName = $firstName, u.lastName = $lastName, u.phone = $phone';
+    let params = { userId: req.user.userId, firstName, lastName, phone };
+
+    if (avatar !== undefined) {
+      query = 'MATCH (u:User {id: $userId}) SET u.firstName = $firstName, u.lastName = $lastName, u.phone = $phone, u.avatar = $avatar';
+      params.avatar = avatar;
+    }
+
+    query += ' RETURN u';
 
     const result = await withSession(session =>
-      session.run(
-        'MATCH (u:User {id: $userId}) SET u.firstName = $firstName, u.lastName = $lastName, u.phone = $phone RETURN u',
-        { userId: req.user.userId, firstName, lastName, phone }
-      )
+      session.run(query, params)
     );
 
     if (result.records.length === 0) {
@@ -56,6 +64,7 @@ const updateProfile = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        avatar: user.avatar,
         createdAt: user.createdAt ? user.createdAt.toString() : null
       }
     });
@@ -142,13 +151,13 @@ const requestPasswordChangeOTP = async (req, res) => {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
-    const { otpId, otp } = createOtpEntry({
+    const { otpId } = await createOtpEntry({
       purpose: 'password_change',
       userId: req.user.userId,
       newPassword: newPassword
     });
 
-    res.json({ message: 'OTP sent', otpId, otp });
+    res.json({ message: 'OTP sent', otpId });
   } catch (error) {
     console.error('Request password OTP error:', error);
     res.status(500).json({ error: 'Failed to request OTP' });
@@ -163,7 +172,7 @@ const changePasswordWithOTP = async (req, res) => {
       return res.status(400).json({ error: 'OTP ID and OTP are required' });
     }
 
-    const verification = verifyOtpEntry(otpId, otp);
+    const verification = await verifyOtpEntry(otpId, otp);
 
     if (!verification.valid) {
       return res.status(400).json({ error: `OTP ${verification.reason}` });

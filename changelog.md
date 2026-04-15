@@ -4,6 +4,58 @@ All notable changes to NexusBank project.
 
 ## [Unreleased]
 
+### Added
+- **Security Features**
+  - Helmet.js security headers
+  - CORS configuration with allowed origins
+  - Body size limit (10kb) for DOS prevention
+  - Token blacklisting to Neo4j (revoked tokens stored persistently)
+  - Refresh token mechanism with Neo4j persistence
+  - Rate limiting for OTP generation (3 req/min)
+
+- **Backend API Endpoints**
+  - `POST /api/auth/forgot-password` - Request password reset OTP
+  - `POST /api/auth/reset-password` - Reset password with OTP verification
+  - `POST /api/contact` - Contact form submission
+  - `GET /api/beneficiaries` - List user beneficiaries
+  - `POST /api/beneficiaries` - Add new beneficiary
+  - `DELETE /api/beneficiaries/:id` - Remove beneficiary
+
+- **OTP System Refactor**
+  - Moved from in-memory Map to Neo4j persistence
+  - OTP lockout after 3 failed attempts
+  - Automatic cleanup of expired OTPs
+  - Support for multiple OTP purposes (transfer, forgot_password, general)
+
+- **Frontend Features**
+  - Beneficiaries management page (`/beneficiaries`)
+  - Forgot password flow (`/forgot-password`)
+  - Avatar/profile picture support
+  - Password confirmation on registration
+  - OTP countdown timer and resend button
+  - Transaction receipt download
+
+- **Input Validation & Security**
+  - XSS sanitization on transaction descriptions
+  - Input sanitization middleware
+  - Password validation (8+ chars, uppercase, lowercase, number, special char)
+
+- **Logging & Monitoring**
+  - Winston structured logging
+  - Global exception handler middleware
+  - Database indexes for performance
+
+### Fixed
+- OTP persistence to Neo4j (parameter ordering, timestamp handling)
+- Forgot password email storage in OTP entry
+- Reset password email verification logic
+- User ID default value in OTP creation
+- `checkRateLimit` function import error in transaction controller
+- Registration password confirmation validation
+
+### Testing
+- OTP utilities tests (8 tests passing)
+
 ## [1.0.2] - 2026-04-14
 
 ### Added

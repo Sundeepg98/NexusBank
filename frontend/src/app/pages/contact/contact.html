@@ -52,7 +52,9 @@
             required></textarea>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn" [disabled]="!isFormValid()">Send Message</button>
+          <button type="submit" class="btn" [disabled]="!isFormValid() || submitting()">
+            {{ submitting() ? 'Sending...' : 'Send Message' }}
+          </button>
           <button type="button" class="btn-secondary" (click)="clearForm()">Clear</button>
         </div>
       </form>
@@ -83,3 +85,10 @@
     </div>
   </div>
 </section>
+
+<app-toast
+  [show]="showToast()"
+  [message]="toastMessage()"
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>

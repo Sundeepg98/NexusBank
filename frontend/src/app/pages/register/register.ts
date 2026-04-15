@@ -55,7 +55,7 @@ export class Register {
     }
 
     this.isLoading.set(true);
-    const { firstName, lastName, email, username, phone, password } = this.registerForm.value;
+    const { firstName, lastName, email, username, phone, password, confirmPassword } = this.registerForm.value;
 
     this.apiService.register({
       firstName,
@@ -64,6 +64,7 @@ export class Register {
       username,
       phone: phone || undefined,
       password,
+      confirmPassword,
     }).subscribe({
       next: (response: AuthResponse) => {
         this.isLoading.set(false);

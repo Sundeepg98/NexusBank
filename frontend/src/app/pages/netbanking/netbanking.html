@@ -39,7 +39,7 @@
         <p>View your transaction history</p>
       </app-card>
       
-      <app-card 
+      <app-card
         [clickable]="true"
         (clicked)="profile()"
         class="dashboard-card"
@@ -47,6 +47,17 @@
         <span class="card-icon">👤</span>
         <h3>Profile</h3>
         <p>Manage your account settings</p>
+      </app-card>
+
+      <app-card
+        [clickable]="true"
+        (clicked)="viewBeneficiaries()"
+        class="dashboard-card"
+        [class.active]="showBeneficiaries()"
+      >
+        <span class="card-icon">👥</span>
+        <h3>Beneficiaries</h3>
+        <p>Manage your saved beneficiaries</p>
       </app-card>
     </div>
     
@@ -260,11 +271,19 @@
               </button>
             } @else {
               <div class="otp-section">
+                <div class="otp-expire-notice">
+                  @if (otpCountdown() > 0) {
+                    <span class="countdown-text">OTP expires in {{ otpCountdown() }} seconds</span>
+                  } @else {
+                    <span class="countdown-text expired">OTP has expired</span>
+                  }
+                </div>
+
                 <div class="form-group">
                   <label for="otp">Enter OTP (6 digits)</label>
-                  <input 
+                  <input
                     id="otp"
-                    type="text" 
+                    type="text"
                     [value]="otpValue()"
                     (input)="otpValue.set($any($event.target).value)"
                     placeholder="Enter 6-digit OTP"
@@ -272,21 +291,30 @@
                     class="otp-input"
                   >
                 </div>
-                
-                <button 
-                  type="submit" 
+
+                <button
+                  type="submit"
                   class="btn btn-primary"
                   [disabled]="transferForm.invalid || otpState() === 'loading'"
                 >
                   {{ otpState() === 'loading' ? 'Verifying OTP...' : 'Confirm Transfer' }}
                 </button>
-                
-                <button 
-                  type="button" 
+
+                <button
+                  type="button"
                   class="btn btn-secondary"
                   (click)="resetTransferState()"
                 >
                   Cancel
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-resend"
+                  [disabled]="!canResendOTP() || otpState() === 'loading'"
+                  (click)="resendOTP()"
+                >
+                  {{ canResendOTP() ? 'Resend OTP' : 'Resend OTP (' + otpCountdown() + 's)' }}
                 </button>
               </div>
             }
@@ -349,24 +377,75 @@
             <button type="button" class="btn btn-add" (click)="addRecipient()">
               + Add Another Recipient
             </button>
-            
-            <div class="form-actions">
-              <button 
-                type="submit" 
-                class="btn btn-primary"
-                [disabled]="batchTransferForm.invalid || transferState() === 'loading'"
-              >
-                {{ transferState() === 'loading' ? 'Processing...' : 'Send All Transfers' }}
-              </button>
-              
-              <button 
-                type="button" 
-                class="btn btn-secondary"
-                (click)="showBatchTransfer.set(false)"
-              >
-                Cancel
-              </button>
-            </div>
+
+            @if (!showBatchOTPInput()) {
+              <div class="form-actions">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="batchTransferForm.invalid || transferState() === 'loading'"
+                >
+                  {{ transferState() === 'loading' ? 'Generating OTP...' : 'Send All Transfers' }}
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  (click)="showBatchTransfer.set(false)"
+                >
+                  Cancel
+                </button>
+              </div>
+            } @else {
+              <div class="otp-section">
+                <div class="otp-expire-notice">
+                  @if (batchOtpCountdown() > 0) {
+                    <span class="countdown-text">OTP expires in {{ batchOtpCountdown() }} seconds</span>
+                  } @else {
+                    <span class="countdown-text expired">OTP has expired</span>
+                  }
+                </div>
+
+                <div class="form-group">
+                  <label for="batchOtp">Enter OTP (6 digits)</label>
+                  <input
+                    id="batchOtp"
+                    type="text"
+                    [value]="batchOTPValue()"
+                    (input)="batchOTPValue.set($any($event.target).value)"
+                    placeholder="Enter 6-digit OTP"
+                    maxlength="6"
+                    class="otp-input"
+                  >
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="batchOTPState() === 'loading' || transferState() === 'loading'"
+                  (click)="verifyBatchOTP()"
+                >
+                  {{ batchOTPState() === 'loading' ? 'Verifying OTP...' : 'Confirm Batch Transfer' }}
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  (click)="resetBatchTransferState()"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-resend"
+                  [disabled]="!canResendBatchOTP() || batchOTPState() === 'loading'"
+                  (click)="resendBatchOTP()"
+                >
+                  {{ canResendBatchOTP() ? 'Resend OTP' : 'Resend OTP (' + batchOtpCountdown() + 's)' }}
+                </button>
+              </div>
+            }
           </form>
         }
       </div>
@@ -446,6 +525,60 @@
       <button (click)="logout()" class="btn btn-logout">Logout</button>
     </div>
   </div>
+
+  @if (showReceipt() && lastTransaction()) {
+    <div class="receipt-overlay" (click)="closeReceipt()">
+      <div class="receipt-modal" (click)="$event.stopPropagation()">
+        <div class="receipt-header">
+          <div class="receipt-icon">✓</div>
+          <h2>Transfer Successful!</h2>
+          <p>Your transfer has been completed successfully.</p>
+        </div>
+        <div class="receipt-body">
+          <div class="receipt-row">
+            <span class="receipt-label">Transaction ID</span>
+            <span class="receipt-value mono">{{ lastTransaction()!.transactionId }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Reference</span>
+            <span class="receipt-value mono">NXB-{{ lastTransaction()!.transactionId.substring(0, 8).toUpperCase() }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">From Account</span>
+            <span class="receipt-value">{{ lastTransaction()!.fromAccount }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">To Account</span>
+            <span class="receipt-value">{{ lastTransaction()!.toAccount }}</span>
+          </div>
+          <div class="receipt-row highlight">
+            <span class="receipt-label">Amount</span>
+            <span class="receipt-value amount">${{ lastTransaction()!.amount | number:'1.2-2' }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Description</span>
+            <span class="receipt-value">{{ lastTransaction()!.description }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Date & Time</span>
+            <span class="receipt-value">{{ lastTransaction()!.timestamp | dateFormat }}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Status</span>
+            <span class="receipt-value status success">Completed</span>
+          </div>
+        </div>
+        <div class="receipt-footer">
+          <button class="btn btn-primary" (click)="downloadReceipt()">
+            Download Receipt
+          </button>
+          <button class="btn btn-secondary" (click)="closeReceipt()">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </section>
 
 <app-toast 
@@ -455,7 +588,7 @@
   (closed)="closeToast()"
 />
 
-<app-loading 
-  [show]="loadState() === 'loading' || transferState() === 'loading' || creatingAccount()" 
-  [message]="creatingAccount() ? 'Creating account...' : (transferState() === 'loading' ? 'Processing transfer...' : '')" 
+<app-loading
+  [show]="loadState() === 'loading' || transferState() === 'loading' || creatingAccount() || batchOTPState() === 'loading'"
+  [message]="creatingAccount() ? 'Creating account...' : (batchOTPState() === 'loading' ? 'Verifying OTP...' : (transferState() === 'loading' ? 'Processing transfer...' : ''))"
 />

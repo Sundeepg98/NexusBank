@@ -12,6 +12,7 @@ import { User } from '../../models';
 
 type LoadState = 'idle' | 'loading' | 'error' | 'success';
 type ChangePasswordState = 'idle' | 'loading' | 'error' | 'success';
+type DeleteAccountState = 'idle' | 'loading' | 'error' | 'success';
 
 @Component({
   selector: 'app-profile',
@@ -44,6 +45,8 @@ export class Profile implements OnInit {
   otpRequested = signal(false);
   otpId = signal('');
   otpError = signal('');
+  showDeleteModal = signal(false);
+  deleteAccountState = signal<DeleteAccountState>('idle');
 
   passwordForm: FormGroup = this.fb.group({
     currentPassword: ['', [Validators.required, Validators.minLength(8)]],
@@ -59,6 +62,12 @@ export class Profile implements OnInit {
   userName = computed(() => {
     const u = this.user();
     return u ? `${u.firstName} ${u.lastName}` : '';
+  });
+
+  userInitials = computed(() => {
+    const u = this.user();
+    if (!u) return '';
+    return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase();
   });
 
   ngOnInit(): void {
@@ -167,6 +176,68 @@ export class Profile implements OnInit {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/welcome']);
+  }
+
+  openDeleteModal(): void {
+    this.showDeleteModal.set(true);
+  }
+
+  closeDeleteModal(): void {
+    this.showDeleteModal.set(false);
+    this.deleteAccountState.set('idle');
+  }
+
+  confirmDelete(): void {
+    this.deleteAccountState.set('loading');
+    this.apiService.deleteProfile()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.deleteAccountState.set('success');
+          this.showToastMessage('Account deleted successfully', 'success');
+          this.closeDeleteModal();
+          setTimeout(() => {
+            this.authService.logout();
+            this.router.navigate(['/welcome']);
+          }, 1000);
+        },
+        error: (err: Error) => {
+          this.deleteAccountState.set('error');
+          this.showToastMessage(err.message || 'Failed to delete account', 'error');
+        }
+      });
+  }
+
+  onAvatarSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+      this.showToastMessage('Please select an image file', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      this.updateAvatar(result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  private updateAvatar(avatar: string): void {
+    this.apiService.updateAvatar(avatar)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.user.set(response.user);
+          this.showToastMessage('Avatar updated successfully', 'success');
+        },
+        error: (err: Error) => {
+          this.showToastMessage(err.message || 'Failed to update avatar', 'error');
+        }
+      });
   }
 
   private showToastMessage(message: string, type: 'success' | 'error' | 'warning'): void {

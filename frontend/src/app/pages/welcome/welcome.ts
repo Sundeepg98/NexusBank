@@ -3,10 +3,9 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth';
-import { ApiService } from '../../services/api';
+import { ApiService, LoginResponse } from '../../services/api';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
-import { AuthResponse } from '../../models';
 
 @Component({
   selector: 'app-welcome',
@@ -44,8 +43,8 @@ export class Welcome {
     const { email, password } = this.loginForm.value;
 
     this.apiService.login(email, password).subscribe({
-      next: (response: AuthResponse) => {
-        this.authService.login(response.token, response.user);
+      next: (response: LoginResponse) => {
+        this.authService.login(response.token, response.user, response.refreshToken, response.refreshTokenExpiry);
         this.router.navigate(['/netbanking']);
         this.isLoading.set(false);
       },
@@ -60,7 +59,7 @@ export class Welcome {
     this.toastMessage.set(message);
     this.toastType.set(type);
     this.showToast.set(true);
-    
+
     setTimeout(() => {
       this.showToast.set(false);
     }, 5000);

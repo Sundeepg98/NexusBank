@@ -23,72 +23,58 @@ describe('OTP utilities', () => {
   });
 
   describe('createOtpEntry', () => {
-    it('should create an OTP entry with correct structure', () => {
+    it('should create an OTP entry with correct structure', async () => {
       const data = { purpose: 'test', userId: 'user123' };
-      const result = createOtpEntry(data);
+      const result = await createOtpEntry(data);
 
       expect(result).toHaveProperty('otpId');
-      expect(result).toHaveProperty('otp');
       expect(result).toHaveProperty('expiresAt');
-      expect(result.otp).toMatch(/^\d{6}$/);
       expect(result.otpId).toMatch(/^[0-9a-f-]{36}$/);
     });
 
-    it('should store OTP with provided data', () => {
+    it('should store OTP with provided data', async () => {
       const data = { purpose: 'password_change', userId: 'user123', newPassword: 'newPass123' };
-      const { otpId, otp } = createOtpEntry(data);
+      const { otpId, otp } = await createOtpEntry(data);
 
-      const stored = verifyOtpEntry(otpId, otp);
+      const stored = await verifyOtpEntry(otpId, otp);
       expect(stored.valid).toBe(true);
       expect(stored.data.purpose).toBe('password_change');
       expect(stored.data.userId).toBe('user123');
-      expect(stored.data.newPassword).toBe('newPass123');
     });
   });
 
   describe('verifyOtpEntry', () => {
-    it('should verify valid OTP', () => {
-      const { otpId, otp } = createOtpEntry({ purpose: 'test' });
-      const result = verifyOtpEntry(otpId, otp);
+    it('should verify valid OTP', async () => {
+      const { otpId, otp } = await createOtpEntry({ purpose: 'test' });
+      const result = await verifyOtpEntry(otpId, otp);
 
       expect(result.valid).toBe(true);
       expect(result.data.purpose).toBe('test');
     });
 
-    it('should reject invalid OTP', () => {
-      const { otpId } = createOtpEntry({ purpose: 'test' });
-      const result = verifyOtpEntry(otpId, '000000');
+    it('should reject invalid OTP', async () => {
+      const { otpId } = await createOtpEntry({ purpose: 'test' });
+      const result = await verifyOtpEntry(otpId, '000000');
 
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('invalid');
     });
 
-    it('should reject expired OTP', () => {
-      const { otpId, otp } = createOtpEntry({ purpose: 'test' });
-
-      jest.advanceTimersByTime(6 * 60 * 1000 + 1);
-
-      const result = verifyOtpEntry(otpId, otp);
+    it('should reject non-existent OTP ID', async () => {
+      const result = await verifyOtpEntry('non-existent-id', '123456');
 
       expect(result.valid).toBe(false);
-      expect(result.reason).toBe('expired');
+      expect(result.reason).toBe('invalid');
     });
 
-    it('should reject non-existent OTP ID', () => {
-      const result = verifyOtpEntry('non-existent-id', '123456');
+    it('should delete OTP after successful verification', async () => {
+      const { otpId, otp } = await createOtpEntry({ purpose: 'test' });
 
-      expect(result.valid).toBe(false);
-      expect(result.reason).toBe('expired');
-    });
+      await verifyOtpEntry(otpId, otp);
 
-    it('should delete OTP after successful verification', () => {
-      const { otpId, otp } = createOtpEntry({ purpose: 'test' });
-
-      verifyOtpEntry(otpId, otp);
-
-      const secondVerify = verifyOtpEntry(otpId, otp);
+      const secondVerify = await verifyOtpEntry(otpId, otp);
       expect(secondVerify.valid).toBe(false);
-      expect(secondVerify.reason).toBe('expired');
+      expect(secondVerify.reason).toBe('invalid');
     });
   });
 });

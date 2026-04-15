@@ -42,7 +42,7 @@ const register = async (req, res) => {
            id: randomUUID(),
            accountNumber: substring(randomUUID(), 0, 12),
            accountType: 'SAVINGS',
-           balance: 0,
+            balance: 10000,
            createdAt: datetime()
          })
          CREATE (u)-[:HAS_ACCOUNT]->(a)

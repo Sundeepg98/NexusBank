@@ -1,0 +1,150 @@
+<section class="page">
+  <div class="beneficiaries-container">
+    <header class="page-header">
+      <button class="btn-back" (click)="goBack()">← Back to Netbanking</button>
+      <h1>Beneficiaries</h1>
+      <p>Manage your saved beneficiaries for easy transfers</p>
+    </header>
+
+    <div class="actions-bar">
+      <button class="btn btn-primary" (click)="openAddModal()">
+        + Add Beneficiary
+      </button>
+    </div>
+
+    @if (loadState() === 'loading') {
+      <div class="loading-state">
+        <app-loading [show]="true" [message]="'Loading beneficiaries...'" />
+      </div>
+    } @else if (loadState() === 'error') {
+      <div class="error-state">
+        <p>Failed to load beneficiaries</p>
+        <button class="btn btn-secondary" (click)="loadBeneficiaries()">Retry</button>
+      </div>
+    } @else {
+      <div class="beneficiaries-list">
+        @for (beneficiary of beneficiaries(); track beneficiary.id) {
+          <div class="beneficiary-card">
+            <div class="beneficiary-info">
+              <div class="beneficiary-avatar">
+                {{ beneficiary.nickname.charAt(0).toUpperCase() }}
+              </div>
+              <div class="beneficiary-details">
+                <h3>{{ beneficiary.nickname }}</h3>
+                <p class="bank-name">{{ beneficiary.bankName }}</p>
+                <p class="account-number">{{ beneficiary.accountNumber }}</p>
+              </div>
+            </div>
+            <div class="beneficiary-actions">
+              <button class="btn-icon btn-edit" (click)="openEditModal(beneficiary)" title="Edit">
+                ✎
+              </button>
+              <button class="btn-icon btn-delete" (click)="openDeleteConfirm(beneficiary)" title="Delete">
+                ✕
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <h3>No Beneficiaries</h3>
+            <p>You haven't added any beneficiaries yet.</p>
+            <button class="btn btn-primary" (click)="openAddModal()">Add Your First Beneficiary</button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  @if (showAddModal() || showEditModal()) {
+    <div class="modal-overlay" (click)="showAddModal() ? closeAddModal() : closeEditModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ showAddModal() ? 'Add Beneficiary' : 'Edit Beneficiary' }}</h2>
+          <button class="close-btn" (click)="showAddModal() ? closeAddModal() : closeEditModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="accountNumber">Account Number</label>
+            <input
+              id="accountNumber"
+              type="text"
+              [value]="formAccountNumber()"
+              (input)="formAccountNumber.set($any($event.target).value); validateForm()"
+              placeholder="Enter 10-14 digit account number"
+              [disabled]="showEditModal()"
+            >
+            @if (formAccountNumber() && !/^\d{10,14}$/.test(formAccountNumber())) {
+              <span class="error-text">Account number must be 10-14 digits</span>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="nickname">Nickname</label>
+            <input
+              id="nickname"
+              type="text"
+              [value]="formNickname()"
+              (input)="formNickname.set($any($event.target).value); validateForm()"
+              placeholder="e.g., Mom, John"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="bankName">Bank Name</label>
+            <input
+              id="bankName"
+              type="text"
+              [value]="formBankName()"
+              (input)="formBankName.set($any($event.target).value); validateForm()"
+              placeholder="e.g., Chase Bank"
+            >
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="btn btn-primary"
+            [disabled]="!isFormValid()"
+            (click)="showAddModal() ? addBeneficiary() : updateBeneficiary()"
+          >
+            {{ showAddModal() ? 'Add Beneficiary' : 'Save Changes' }}
+          </button>
+          <button
+            class="btn btn-secondary"
+            (click)="showAddModal() ? closeAddModal() : closeEditModal()"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showDeleteConfirm()) {
+    <div class="modal-overlay" (click)="closeDeleteConfirm()">
+      <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Confirm Delete</h2>
+          <button class="close-btn" (click)="closeDeleteConfirm()">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete <strong>{{ deletingBeneficiary()?.nickname }}</strong>?</p>
+          <p class="warning-text">This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-danger" (click)="deleteBeneficiary()">Delete</button>
+          <button class="btn btn-secondary" (click)="closeDeleteConfirm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  }
+</section>
+
+<app-toast
+  [show]="showToast()"
+  [message]="toastMessage()"
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>
+
+<app-loading [show]="loadState() === 'loading'" [message]="''" />

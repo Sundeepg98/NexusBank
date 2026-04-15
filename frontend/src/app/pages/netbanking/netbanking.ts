@@ -61,6 +61,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   showTransfer = signal(false);
   showTransactions = signal(false);
   showCreateAccount = signal(false);
+  showBeneficiaries = signal(false);
   toastMessage = signal('');
   toastType = signal<'success' | 'error' | 'warning'>('success');
   showToast = signal(false);
@@ -73,6 +74,31 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   otpId = signal('');
   otpValue = signal('');
   otpState = signal<LoadingState>('idle');
+  otpCountdown = signal(0);
+  canResendOTP = signal(false);
+  private otpTimerInterval: any;
+  private resendTimeout: any;
+
+  // Batch OTP state
+  showBatchOTPInput = signal(false);
+  batchOTPId = signal('');
+  batchOTPValue = signal('');
+  batchOTPState = signal<LoadingState>('idle');
+  batchOtpCountdown = signal(0);
+  canResendBatchOTP = signal(false);
+  private batchOtpTimerInterval: any;
+  private batchResendTimeout: any;
+
+  // Receipt state
+  showReceipt = signal(false);
+  lastTransaction = signal<{
+    transactionId: string;
+    fromAccount: string;
+    toAccount: string;
+    amount: number;
+    description: string;
+    timestamp: string;
+  } | null>(null);
 
   // Forms
   transferForm!: FormGroup;
@@ -127,6 +153,130 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     if (this.sessionCheckInterval) {
       clearInterval(this.sessionCheckInterval);
     }
+    this.clearOTPTimers();
+    this.clearBatchOTPTimers();
+  }
+
+  private clearOTPTimers(): void {
+    if (this.otpTimerInterval) {
+      clearInterval(this.otpTimerInterval);
+      this.otpTimerInterval = undefined;
+    }
+    if (this.resendTimeout) {
+      clearTimeout(this.resendTimeout);
+      this.resendTimeout = undefined;
+    }
+  }
+
+  private clearBatchOTPTimers(): void {
+    if (this.batchOtpTimerInterval) {
+      clearInterval(this.batchOtpTimerInterval);
+      this.batchOtpTimerInterval = undefined;
+    }
+    if (this.batchResendTimeout) {
+      clearTimeout(this.batchResendTimeout);
+      this.batchResendTimeout = undefined;
+    }
+  }
+
+  private startBatchOTPCountdown(seconds: number): void {
+    this.clearBatchOTPTimers();
+    this.batchOtpCountdown.set(seconds);
+    this.canResendBatchOTP.set(false);
+
+    this.batchOtpTimerInterval = setInterval(() => {
+      const current = this.batchOtpCountdown();
+      if (current <= 1) {
+        this.batchOtpCountdown.set(0);
+        this.canResendBatchOTP.set(true);
+        if (this.batchOtpTimerInterval) {
+          clearInterval(this.batchOtpTimerInterval);
+          this.batchOtpTimerInterval = undefined;
+        }
+      } else {
+        this.batchOtpCountdown.set(current - 1);
+      }
+    }, 1000);
+
+    this.batchResendTimeout = setTimeout(() => {
+      this.canResendBatchOTP.set(true);
+    }, seconds * 1000);
+  }
+
+  private startOTPCountdown(seconds: number): void {
+    this.clearOTPTimers();
+    this.otpCountdown.set(seconds);
+    this.canResendOTP.set(false);
+
+    this.otpTimerInterval = setInterval(() => {
+      const current = this.otpCountdown();
+      if (current <= 1) {
+        this.otpCountdown.set(0);
+        this.canResendOTP.set(true);
+        if (this.otpTimerInterval) {
+          clearInterval(this.otpTimerInterval);
+          this.otpTimerInterval = undefined;
+        }
+      } else {
+        this.otpCountdown.set(current - 1);
+      }
+    }, 1000);
+
+    this.resendTimeout = setTimeout(() => {
+      this.canResendOTP.set(true);
+    }, seconds * 1000);
+  }
+
+  resendOTP(): void {
+    if (!this.canResendOTP()) return;
+
+    const formValue = this.transferForm.value;
+    this.otpState.set('loading');
+
+    this.apiService.generateOTP({
+      fromAccountId: formValue.fromAccountId,
+      toAccountNumber: formValue.toAccountNumber,
+      amount: formValue.amount,
+    })
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (response) => {
+        this.otpId.set(response.otpId);
+        this.startOTPCountdown(30);
+        this.otpState.set('idle');
+        this.showToastMessage(`OTP resent! For demo, your OTP is: ${response.otp}`, 'success');
+      },
+      error: (err: Error) => {
+        this.otpState.set('error');
+        this.showToastMessage(err.message || 'Failed to resend OTP', 'error');
+      },
+    });
+  }
+
+  resendBatchOTP(): void {
+    if (!this.canResendBatchOTP()) return;
+
+    const formValue = this.batchTransferForm.value;
+    this.batchOTPState.set('loading');
+
+    this.apiService.generateOTP({
+      fromAccountId: formValue.fromAccountId,
+      toAccountNumber: 'BATCH_TRANSFER',
+      amount: 0,
+    })
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (response) => {
+        this.batchOTPId.set(response.otpId);
+        this.startBatchOTPCountdown(30);
+        this.batchOTPState.set('idle');
+        this.showToastMessage(`OTP resent! For demo, your OTP is: ${response.otp}`, 'success');
+      },
+      error: (err: Error) => {
+        this.batchOTPState.set('error');
+        this.showToastMessage(err.message || 'Failed to resend OTP', 'error');
+      },
+    });
   }
 
   @HostListener('document:mousemove')
@@ -254,12 +404,72 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    this.transferState.set('loading');
+    const formValue = this.batchTransferForm.value;
+
+    if (!this.showBatchOTPInput()) {
+      this.transferState.set('loading');
+      this.apiService.generateOTP({
+        fromAccountId: formValue.fromAccountId,
+        toAccountNumber: 'BATCH_TRANSFER',
+        amount: 0,
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.transferState.set('success');
+          this.batchOTPId.set(response.otpId);
+          this.showBatchOTPInput.set(true);
+          this.startBatchOTPCountdown(30);
+          this.showToastMessage(`OTP sent for batch transfer! For demo, your OTP is: ${response.otp}`, 'success');
+        },
+        error: (err: Error) => {
+          this.transferState.set('error');
+          this.showToastMessage(err.message || 'Failed to generate OTP', 'error');
+        },
+      });
+    } else {
+      this.verifyBatchOTP();
+    }
+  }
+
+  verifyBatchOTP(): void {
+    if (!this.batchOTPValue() || this.batchOTPValue().length !== 6) {
+      this.showToastMessage('Please enter a valid 6-digit OTP', 'error');
+      return;
+    }
+
     const formValue = this.batchTransferForm.value;
     const recipientArray = formValue.recipients as { toAccountNumber: string; amount: number; description: string }[];
 
+    this.batchOTPState.set('loading');
+    this.transferState.set('loading');
+
+    this.apiService.verifyOTP({
+      otpId: this.batchOTPId(),
+      otp: this.batchOTPValue(),
+      fromAccountId: formValue.fromAccountId,
+      toAccountNumber: 'BATCH_TRANSFER',
+      amount: 0,
+      description: `Batch transfer to ${recipientArray.length} recipients`,
+    })
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: () => {
+        this.batchOTPState.set('success');
+        this.executeBatchTransfers(formValue, recipientArray);
+      },
+      error: (err: Error) => {
+        this.batchOTPState.set('error');
+        this.transferState.set('error');
+        this.showToastMessage(err.message || 'OTP verification failed', 'error');
+      },
+    });
+  }
+
+  private executeBatchTransfers(formValue: any, recipientArray: { toAccountNumber: string; amount: number; description: string }[]): void {
     let completed = 0;
     let hasError = false;
+    const totalRecipients = recipientArray.length;
 
     recipientArray.forEach((recipient) => {
       this.apiService.transfer({
@@ -272,12 +482,14 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
       .subscribe({
         next: () => {
           completed++;
-          if (completed === recipientArray.length && !hasError) {
+          if (completed === totalRecipients && !hasError) {
             this.transferState.set('success');
             this.showToastMessage(`Successfully transferred to ${completed} recipients!`, 'success');
+            this.resetBatchTransferState();
             this.initBatchTransferForm();
             this.loadAccounts();
             this.showBatchTransfer.set(false);
+            this.showBatchOTPInput.set(false);
           }
         },
         error: (err: Error) => {
@@ -335,6 +547,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.transferState.set('success');
           this.otpId.set(response.otpId);
           this.showOTPInput.set(true);
+          this.startOTPCountdown(30);
           this.showToastMessage(`OTP sent! For demo, your OTP is: ${response.otp}`, 'success');
         },
         error: (err: Error) => {
@@ -359,9 +572,18 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
       })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
+        next: (response) => {
           this.otpState.set('success');
-          this.showToastMessage('Transfer successful!', 'success');
+          const receipt = {
+            transactionId: response.transactionId,
+            fromAccount: formValue.fromAccountId,
+            toAccount: formValue.toAccountNumber,
+            amount: formValue.amount,
+            description: formValue.description || 'Transfer',
+            timestamp: new Date().toISOString()
+          };
+          this.lastTransaction.set(receipt);
+          this.showReceipt.set(true);
           this.resetTransferState();
           this.loadAccounts();
           this.showTransfer.set(false);
@@ -380,6 +602,20 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     this.otpId.set('');
     this.otpValue.set('');
     this.transferState.set('idle');
+    this.otpCountdown.set(0);
+    this.canResendOTP.set(false);
+    this.clearOTPTimers();
+  }
+
+  resetBatchTransferState(): void {
+    this.batchTransferForm.reset();
+    this.showBatchOTPInput.set(false);
+    this.batchOTPId.set('');
+    this.batchOTPValue.set('');
+    this.batchOTPState.set('idle');
+    this.batchOtpCountdown.set(0);
+    this.canResendBatchOTP.set(false);
+    this.clearBatchOTPTimers();
   }
 
   selectAccount(account: Account): void {
@@ -389,6 +625,10 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
   profile(): void {
     this.router.navigate(['/profile']);
+  }
+
+  viewBeneficiaries(): void {
+    this.router.navigate(['/beneficiaries']);
   }
 
   logout(): void {
@@ -421,5 +661,49 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
   closeTransactionDetail(): void {
     this.selectedTransaction.set(null);
+  }
+
+  closeReceipt(): void {
+    this.showReceipt.set(false);
+    this.lastTransaction.set(null);
+  }
+
+  downloadReceipt(): void {
+    const txn = this.lastTransaction();
+    if (!txn) return;
+
+    const receipt = {
+      'Transaction ID': txn.transactionId,
+      'Date & Time': new Date(txn.timestamp).toLocaleString(),
+      'From Account': txn.fromAccount,
+      'To Account': txn.toAccount,
+      'Amount': `$${txn.amount.toFixed(2)}`,
+      'Description': txn.description,
+      'Status': 'Completed',
+      'Reference': `NXB-${txn.transactionId.substring(0, 8).toUpperCase()}`
+    };
+
+    const content = [
+      '========================================',
+      '       NEXUSBANK TRANSFER RECEIPT',
+      '========================================',
+      '',
+      ...Object.entries(receipt).map(([key, value]) => `${key.padEnd(20)}: ${value}`),
+      '',
+      '----------------------------------------',
+      'This is an electronically generated receipt.',
+      'No signature required.',
+      '========================================'
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `receipt-${txn.transactionId.substring(0, 8)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
