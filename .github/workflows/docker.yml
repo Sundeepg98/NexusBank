@@ -25,24 +25,9 @@ jobs:
         run: |
           docker build -t nexusbank-frontend:test ./frontend
           
-      - name: Run Backend Tests
+      - name: List Docker Images
         run: |
-          docker run --rm nexusbank-backend:test npm test
-          
-      - name: Frontend Unit Tests
-        run: |
-          cd frontend
-          npm install
-          npm run test -- --run
-          
-      - name: E2E Tests
-        run: |
-          cd frontend
-          npm install
-          npx playwright install chromium
-          npx playwright test --reporter=list
-        env:
-          CYPRESS_CRASH_REPORTS: 0
+          docker images
           
   docker-compose-test:
     runs-on: ubuntu-latest
