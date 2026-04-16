@@ -109,15 +109,15 @@ export class ApiService {
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  batchTransfer(data: { fromAccountId: string; transfers: { toAccountNumber: string; amount: number; description: string }[] }): Observable<{ success: boolean; message: string }> {
+  batchTransfer(data: { fromAccountId: string; transfers: { toAccountNumber: string; amount: number; description: string }[] }): Observable<{ success: boolean; message: string; transfers: { txnId: string; toAccountNumber: string }[] }> {
     return this.http
-      .post<{ success: boolean; message: string }>(`${this.baseUrl}/transactions/batch-transfer`, data)
+      .post<{ success: boolean; message: string; transfers: { txnId: string; toAccountNumber: string }[] }>(`${this.baseUrl}/transactions/batch-transfer`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 
-  generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; expiresIn: number }> {
+  generateOTP(data: { fromAccountId: string; toAccountNumber: string; amount: number }): Observable<{ message: string; otpId: string; expiresIn: number; otp?: string }> {
     return this.http
-      .post<{ message: string; otpId: string; expiresIn: number }>(`${this.baseUrl}/transactions/generate-otp`, data)
+      .post<{ message: string; otpId: string; expiresIn: number; otp?: string }>(`${this.baseUrl}/transactions/generate-otp`, data)
       .pipe(catchError((err) => this.handleError(err)));
   }
 

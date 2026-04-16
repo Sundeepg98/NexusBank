@@ -7,10 +7,16 @@ const rateLimit = require('express-rate-limit');
 dotenv.config({ path: require('path').join(__dirname, '.env') });
 
 const logger = require('./config/logger');
-const { driver } = require('./config/neo4j');
+const { driver, verifyConnection } = require('./config/neo4j');
 const { sanitizeBody } = require('./middleware/sanitize');
 
 const authRoutes = require('./routes/auth');
+const { cleanupExpiredTokens } = require('./middleware/auth');
+
+cleanupExpiredTokens().catch(err => logger.error('Token cleanup failed:', err));
+setInterval(() => {
+  cleanupExpiredTokens().catch(err => logger.error('Token cleanup failed:', err));
+}, 6 * 60 * 60 * 1000);
 const accountRoutes = require('./routes/accounts');
 const transactionRoutes = require('./routes/transactions');
 const profileRoutes = require('./routes/profile');
@@ -48,22 +54,26 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'test' ? 1000 : 10,
   message: { error: 'Too many authentication attempts, please try again later' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email : 'MISSING_EMAIL';
+    return email;
+  }
 });
-
-app.use('/api', apiLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/login', authLimiter);
 
 const otpLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: process.env.NODE_ENV === 'test' ? 100 : 3,
+  max: process.env.NODE_ENV === 'test' ? 1000 : 3,
   message: { error: 'Too many OTP requests, please try again later' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email : 'MISSING_EMAIL';
+    return email;
+  }
 });
 
 if (process.env.NODE_ENV !== 'test') {
@@ -72,10 +82,14 @@ if (process.env.NODE_ENV !== 'test') {
 
 const otpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'test' ? 100 : 5,
+  max: process.env.NODE_ENV === 'test' ? 1000 : 5,
   message: { error: 'Too many OTP verification attempts, please try again later' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email : 'MISSING_EMAIL';
+    return email;
+  }
 });
 
 if (process.env.NODE_ENV !== 'test') {
@@ -89,6 +103,11 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/beneficiaries', beneficiaryRoutes);
 app.use('/api/contact', contactRoutes);
 
+if (process.env.NODE_ENV === 'test') {
+  const testOtpRoutes = require('./routes/testOtp');
+  app.use('/api/test', testOtpRoutes);
+}
+
 const withSession = async (callback) => {
   const session = driver.session();
   try {
@@ -101,14 +120,18 @@ const withSession = async (callback) => {
 app.get('/api/health', async (req, res) => {
   try {
     await withSession(session => session.run('RETURN 1'));
-    res.json({ status: 'OK', database: 'Neo4j Aura connected' });
+    res.json({ status: 'OK', database: 'connected' });
   } catch (error) {
-    logger.warn('Health check DB connection test skipped');
-    res.json({ status: 'OK', database: 'Connection test skipped' });
+    res.status(503).json({ 
+      status: 'UNHEALTHY', 
+      database: 'disconnected',
+      error: error.message 
+    });
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await verifyConnection();
   logger.info(`NexusBank server running on port ${PORT}`);
   logger.info(`Neo4j: ${process.env.NEO4J_URI}`);
 });

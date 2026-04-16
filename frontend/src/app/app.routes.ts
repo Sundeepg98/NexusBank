@@ -26,9 +26,10 @@ export const routes: Routes = [
     redirectTo: 'contact-us',
     pathMatch: 'full'
   },
+
   {
-    path: 'welcome',
-    loadComponent: () => import('./pages/welcome/welcome').then(m => m.Welcome),
+    path: 'login',
+    loadComponent: () => import('./pages/login/login').then(m => m.Login),
     canActivate: [loginGuard]
   },
   {

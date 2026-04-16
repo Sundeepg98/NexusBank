@@ -177,7 +177,7 @@ export class Profile implements OnInit {
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/welcome']);
+    this.router.navigate(['/login']);
   }
 
   openDeleteModal(): void {
@@ -200,7 +200,7 @@ export class Profile implements OnInit {
           this.closeDeleteModal();
           setTimeout(() => {
             this.authService.logout();
-            this.router.navigate(['/welcome']);
+            this.router.navigate(['/login']);
           }, 1000);
         },
         error: (err: Error) => {

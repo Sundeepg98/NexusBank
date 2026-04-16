@@ -1,0 +1,73 @@
+<section class="page">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="card-header">
+        <h1>Login</h1>
+        <p>Access your NexusBank account</p>
+      </div>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="john@example.com"
+            [class.is-invalid]="hasError('email', 'required') || hasError('email', 'email')"
+            aria-label="Email address"
+          >
+          @if (hasError('email', 'required')) {
+            <span class="error-message">Email is required</span>
+          }
+          @if (hasError('email', 'email')) {
+            <span class="error-message">Please enter a valid email</span>
+          }
+        </div>
+
+        <div class="form-group password-group">
+          <label for="password">Password</label>
+          <div class="password-input">
+            <input
+              id="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              formControlName="password"
+              placeholder="Enter your password"
+              [class.is-invalid]="hasError('password', 'required')"
+              aria-label="Password"
+            >
+            <button type="button" class="toggle-password" (click)="togglePassword()" aria-label="Toggle password visibility">
+              {{ showPassword() ? '🙈' : '👁️' }}
+            </button>
+          </div>
+          @if (hasError('password', 'required')) {
+            <span class="error-message">Password is required</span>
+          }
+        </div>
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="loginForm.invalid || isLoading()"
+        >
+          {{ isLoading() ? 'Logging in...' : 'Login' }}
+        </button>
+
+        <div class="form-links">
+          <a routerLink="/forgot-password" class="link">Forgot Password?</a>
+          <span class="separator">|</span>
+          <a routerLink="/register" class="link">Register</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<app-toast
+  [show]="showToast()"
+  [message]="toastMessage()"
+  [type]="toastType()"
+  (closed)="closeToast()"
+/>
+
+<app-loading [show]="isLoading()" message="Logging you in..." />

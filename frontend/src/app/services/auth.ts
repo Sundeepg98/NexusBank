@@ -102,7 +102,7 @@ export class AuthService {
         this.refreshInProgress = false;
         this.refreshSubject = null;
         this.logout();
-        this.router.navigate(['/welcome']);
+        this.router.navigate(['/login']);
         return throwError(() => new Error(error.error?.error || 'Session expired'));
       })
     );

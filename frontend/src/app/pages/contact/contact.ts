@@ -1,17 +1,19 @@
-import { Component, ChangeDetectionStrategy, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Subject, takeUntil } from 'rxjs';
 import { ToastComponent } from '../../components/toast';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-contact',
-  imports: [FormsModule, ToastComponent],
+  imports: [CommonModule, FormsModule, ToastComponent],
   templateUrl: './contact.html',
   styleUrl: './contact.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class Contact {
+export class Contact implements OnDestroy {
   name = signal('');
   email = signal('');
   message = signal('');
@@ -21,6 +23,7 @@ export class Contact {
   toastMessage = signal('');
   toastType = signal<'success' | 'error' | 'warning'>('success');
   showToast = signal(false);
+  protected destroy$ = new Subject<void>();
 
   emailValid = computed(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -36,8 +39,13 @@ export class Contact {
 
   constructor(private http: HttpClient) {}
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   submitForm() {
-    if (this.isFormValid() || this.submitting()) return;
+    if (this.isFormValid() && !this.submitting()) return;
 
     this.submitting.set(true);
     const payload = {
@@ -47,6 +55,7 @@ export class Contact {
     };
 
     this.http.post<{ message: string }>(`${environment.apiUrl}/contact`, payload)
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {
           this.submitting.set(false);

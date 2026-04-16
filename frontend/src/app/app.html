@@ -1,11 +1,17 @@
 <nav class="navbar">
   <div class="logo">NexusBank</div>
-  <div class="nav-links">
-    <a routerLink="/home">Home</a>
-    <a routerLink="/about-us">About Us</a>
-    <a routerLink="/services">Services</a>
-    <a routerLink="/contact-us">Contact</a>
-    <a routerLink="/netbanking">Net Banking</a>
+  <button class="mobile-menu-toggle" (click)="toggleMobileMenu()" [attr.aria-expanded]="isMobileMenuOpen()" aria-label="Toggle navigation menu">
+    <span class="hamburger"></span>
+  </button>
+  <div class="nav-links" [class.mobile-open]="isMobileMenuOpen()">
+    <a routerLink="/home" (click)="closeMobileMenu()">Home</a>
+    <a routerLink="/about-us" (click)="closeMobileMenu()">About Us</a>
+    <a routerLink="/services" (click)="closeMobileMenu()">Services</a>
+    <a routerLink="/contact-us" (click)="closeMobileMenu()">Contact</a>
+    <a routerLink="/netbanking" (click)="closeMobileMenu()">Net Banking</a>
+    @if (isAuthenticated()) {
+      <button class="logout-btn" (click)="logout()">Logout</button>
+    }
   </div>
 </nav>
 

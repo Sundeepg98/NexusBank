@@ -4,6 +4,42 @@ All notable changes to NexusBank project.
 
 ## [Unreleased]
 
+### Auth Redirects (2026-04-15)
+- **Changed `authGuard`** to redirect to `/login` instead of `/welcome` when unauthenticated
+- **Changed `authInterceptor`** to redirect to `/login` on session expiry (401 errors)
+
+### Architecture Refactoring (2026-04-15)
+
+#### Backend MVC Pattern
+- **Created `controllers/authController.js`** - Extracted auth logic from 440-line route
+- **`routes/auth.js` refactored to thin route** - Reduced from 440 to ~112 lines
+- **Single source of truth for `withSession`** - All controllers import from `config/neo4j`
+- **Created `utils/passwordValidator.js`** - Shared password validation utility
+- **Fixed circular dependency** - `profileController` now imports from utils, not routes
+- **Fixed `bcrypt` vs `bcryptjs`** - `otp.js` now uses `bcryptjs` to match other files
+
+#### SOLID Principles Status
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| **S**ingle Responsibility | ✅ PASS | Controllers have one job each |
+| **O**pen/Closed | ⚠️ PARTIAL | Some duplication exists |
+| **L**iskov Substitution | ✅ PASS | No inheritance hierarchy issues |
+| **I**nterface Segregation | ⚠️ PARTIAL | No formal interfaces |
+| **D**ependency Inversion | ✅ PASS | Controllers depend on abstractions (withSession) |
+
+#### DDD/CQRS/Hexagonal Status
+| Pattern | Status | Notes |
+|---------|--------|-------|
+| **Hexagonal (Ports/Adapters)** | ⚠️ PARTIAL | Routes are adapters, controllers are business logic, but no formal ports |
+| **Domain-Driven Design** | ⚠️ PARTIAL | Entities exist as TypeScript interfaces, but no rich domain models |
+| **CQRS** | ❌ NOT IMPLEMENTED | Commands and queries are in same controllers |
+| **Clean Architecture** | ⚠️ PARTIAL | 4 layers exist but domain logic leaks into controllers |
+
+#### Dead Code Removed
+- Removed duplicate `withSession` definitions from controllers (now import from `config/neo4j`)
+- Removed circular import in `profileController.js`
+- `bcryptjs` consistency across all files
+
 ### Added
 - **Security Features**
   - Helmet.js security headers
@@ -55,6 +91,66 @@ All notable changes to NexusBank project.
 
 ### Testing
 - OTP utilities tests (8 tests passing)
+- Fixed `otp.test.js` - Added `ENABLE_TEST_OTP=true` to jest.setup.js for test mode OTP storage
+- Fixed `otp.test.js` - Proper Neo4j mock returning node properties with `otp` and `plainOtp` fields
+- Fixed `otp.test.js` - bcrypt.compare mock correctly compares plain OTP against stored value
+- All 15 backend tests now passing (OTP: 8, authController: 3, transactionController: 4)
+
+### Frontend Build Fix
+- Fixed `tsconfig.app.json` to exclude `test.ts` from production build (was causing Angular platform-browser-dynamic/testing import error)
+
+### Critical Bug Fixes (2026-04-16)
+- **Fixed registration bug** - `routes/auth.js` was not passing `confirmPassword` to controller, causing password mismatch error even when passwords matched
+- **Fixed transactions route** - Removed reference to non-existent `getTestOTP` function that was preventing server startup
+
+### Rate Limiter Improvements (2026-04-16)
+- **authLimiter**: Now uses IP+email composite key, increased limit to 10 (test: 1000), disabled in test mode
+- **otpLimiter**: Added IP+email composite key, increased limit to 1000 in test mode
+- **otpVerifyLimiter**: Added IP+email composite key, increased limit to 1000 in test mode
+- **All limiters**: Disabled in test environment (NODE_ENV=test) to prevent test interference
+
+### Frontend Bug Fix (2026-04-16)
+- **Fixed login token storage** - `login.ts` was not calling `authService.login()` to store token after successful API response. Added `AuthService` injection and token storage call. Login now redirects to dashboard correctly.
+- **Fixed BrowserModule duplicate import** - `welcome-banner.component.ts` imported `BrowserAnimationsModule` which internally uses BrowserModule, causing NG05100 error. Changed to `CommonModule` + inline animations.
+- **Fixed missing animation trigger** - Added `@fadeIn` animation definition to `welcome-banner.component.ts`.
+
+### Critical Backend Bug Fix (2026-04-16)
+- **Fixed batchTransfer response bug** - `res.json()` was called inside the transaction callback, which could cause race conditions. Moved response outside the transaction to ensure proper commit order.
+
+### Security Fixes (2026-04-16)
+- **Fixed admin endpoint authorization** - Added admin role check to `/admin/revoke-sessions` endpoint. Previously any authenticated user could revoke any user's sessions.
+- **Fixed NaN amount bypass** - Batch transfer now validates that amounts are valid positive numbers using `isNaN()` check.
+- **Fixed email enumeration** - Forgot password now returns same message whether email exists or not to prevent user enumeration attacks.
+
+### Cleanup Fixes (2026-04-16)
+- **Fixed broken import** - Removed `getTestOTP` from `routes/transactions.js` import (was causing server crash on startup).
+- **Removed non-existent API** - Removed `getTestOTP` from frontend `api.ts` service (endpoint doesn't exist on backend).
+
+### Security Improvements (2026-04-16)
+- **Added forgot-password rate limiting** - Added 5 requests per 15 minutes limit to prevent email enumeration attacks.
+- **Fixed Infinity bypass** - Changed `isNaN()` to `Number.isFinite()` for amount validation to catch Infinity values.
+
+### Critical Bug Fixes (2026-04-16)
+- **Fixed deleteUser transaction safety** - Wrapped all delete operations in single `executeWrite` transaction to prevent inconsistent state if any step fails.
+- **Fixed batchTransfer result handling** - Simplified to use `const result = await` pattern to prevent undefined result crashes.
+- **Fixed OTP not displayed in toast** - `createOTP` controller was discarding the `otp` value returned from `createOtpEntry()` in test mode. Controller now forwards `otp` in response when `ENABLE_TEST_OTP=true`. Toast now shows "OTP is: 933016" correctly.
+
+### Additional Security & Quality Fixes (2026-04-16)
+- **Fixed Money.js Infinity bypass** - Changed `isNaN()` to `Number.isFinite()` in value object validation.
+- **Added contact form rate limiting** - Added 10 requests per 15 minutes limit to prevent spam.
+- **Fixed login test assertion** - Corrected email validation test to expect error for invalid email format.
+- **Fixed profileController passwordValidation bug** - Changed `passwordValidation.error` to `passwordValidation.message` in changePasswordWithOTP handler.
+
+### UX Improvements (2026-04-16)
+- **Added aria-live to toast** - Toast component now has `role="alert"` and `aria-live="polite"` for screen reader accessibility.
+- **Fixed forgot password flow** - Combined OTP and password steps into single form for proper UX. OTP is now validated together with password reset in one API call.
+- **Added mobile navigation** - Navbar now has responsive hamburger menu for mobile devices with smooth slide-in animation.
+
+### E2E Test Results (2026-04-16)
+- **All E2E flows working** - Login, dashboard, logout all functional
+- **No console errors** - Clean browser console
+- **Token storage working** - Auth token properly stored and retrieved
+- **Dashboard loads correctly** - Account info, quick actions all displayed
 
 ## [1.0.2] - 2026-04-14
 

@@ -1,0 +1,24 @@
+<div class="welcome-banner" @fadeIn *ngIf="isVisible()">
+  <div class="banner-content">
+    <div class="banner-header">
+      <h2>Welcome to NexusBank! 🎉</h2>
+      <button class="dismiss-btn" (click)="dismiss()" aria-label="Dismiss">×</button>
+    </div>
+    
+    <p class="banner-subtitle">You're all set! Here are some tips to get started:</p>
+    
+    <div class="tips-list">
+      @for (tip of tips; track tip.text) {
+        <div class="tip-item">
+          <span class="tip-icon">{{ tip.icon }}</span>
+          <span class="tip-text">{{ tip.text }}</span>
+        </div>
+      }
+    </div>
+    
+    <div class="banner-actions">
+      <button class="btn btn-primary" (click)="getStarted()">Get Started</button>
+      <button class="btn btn-secondary" (click)="dismiss()">Dismiss</button>
+    </div>
+  </div>
+</div>

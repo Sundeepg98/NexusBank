@@ -4,18 +4,12 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Transaction } from '../models';
 
-export interface StatementRequest {
-  accountId: string;
-  startDate: string;
-  endDate: string;
-}
-
 export interface StatementResponse {
   accountId: string;
   accountNumber: string;
   transactions: Transaction[];
-  startDate: string;
-  endDate: string;
+  fromDate: string;
+  toDate: string;
   totalCredits: number;
   totalDebits: number;
 }
@@ -28,8 +22,8 @@ export class StatementService {
 
   constructor(private http: HttpClient) {}
 
-  getStatement(accountId: string, startDate: string, endDate: string): Observable<StatementResponse> {
-    return this.http.get<StatementResponse>(`${this.baseUrl}/accounts/${accountId}/statement?startDate=${startDate}&endDate=${endDate}`);
+  getStatement(accountId: string, from: string, to: string): Observable<StatementResponse> {
+    return this.http.get<StatementResponse>(`${this.baseUrl}/accounts/${accountId}/statement?from=${from}&to=${to}`);
   }
 
   generateCsv(transactions: Transaction[]): string {
@@ -39,13 +33,6 @@ export class StatementService {
       `${t.timestamp},${t.description},${t.amount},${t.type || 'N/A'},${t.fromAccount || ''},${t.toAccount || ''}`
     ).join('\n');
     return headers + rows;
-  }
-
-  filterByDateRange(transactions: Transaction[], startDate: Date, endDate: Date): Transaction[] {
-    return transactions.filter(t => {
-      const txDate = new Date(t.timestamp);
-      return txDate >= startDate && txDate <= endDate;
-    });
   }
 
   calculateTotals(transactions: Transaction[]): { credits: number; debits: number } {

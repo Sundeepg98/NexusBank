@@ -21,9 +21,9 @@ import { trigger, state, style, animate, transition } from '@angular/animations'
   ],
   template: `
     @if (show()) {
-      <div class="toast" [class]="type()" @slideIn>
+      <div class="toast" [class]="type()" @slideIn role="alert" aria-live="polite">
         <span class="message">{{ message() }}</span>
-        <button class="close" (click)="onClose()">&times;</button>
+        <button class="close" (click)="onClose()" aria-label="Close notification">&times;</button>
       </div>
     }
   `,

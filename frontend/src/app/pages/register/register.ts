@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
 import { ApiService } from '../../services/api';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
@@ -12,15 +13,17 @@ import { AuthResponse } from '../../models';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink, ToastComponent, LoadingComponent],
   templateUrl: './register.html',
-  styleUrl: './register.scss'
+  styleUrl: './register.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class Register {
+export class Register implements OnDestroy {
   registerForm: FormGroup;
   isLoading = signal(false);
   toastMessage = signal('');
   toastType = signal<'success' | 'error' | 'warning'>('error');
   showToast = signal(false);
   showPassword = signal(false);
+  protected destroy$ = new Subject<void>();
 
   constructor(
     private fb: FormBuilder,
@@ -65,12 +68,12 @@ export class Register {
       phone: phone || undefined,
       password,
       confirmPassword,
-    }).subscribe({
+    }).pipe(takeUntil(this.destroy$)).subscribe({
       next: (response: AuthResponse) => {
         this.isLoading.set(false);
-        this.showToastMessage('Registration successful! Please login.', 'success');
+        this.showToastMessage('Registration successful! Please login with your credentials.', 'success');
         setTimeout(() => {
-          this.router.navigate(['/welcome']);
+          this.router.navigate(['/login']);
         }, 2000);
       },
       error: (err: Error) => {
@@ -101,5 +104,10 @@ export class Register {
 
   closeToast(): void {
     this.showToast.set(false);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

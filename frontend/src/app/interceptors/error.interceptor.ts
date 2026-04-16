@@ -2,10 +2,11 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { of } from 'rxjs';
+import { AuthService } from '../services/auth';
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
+  const authService = inject(AuthService);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -17,9 +18,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         switch (error.status) {
           case 401:
             errorMessage = 'Unauthorized. Please login again.';
-            localStorage.removeItem('nexusbank_token');
-            localStorage.removeItem('nexusbank_user');
-            router.navigate(['/welcome']);
+            authService.logout();
             break;
           case 403:
             errorMessage = 'Forbidden. You do not have permission.';
@@ -31,7 +30,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
             errorMessage = 'Server error. Please try again later.';
             break;
           default:
-            errorMessage = error.error?.error || `Error: ${error.status}`;
+            errorMessage = error.error?.error?.message || error.error?.error || `Error: ${error.status}`;
         }
       }
 

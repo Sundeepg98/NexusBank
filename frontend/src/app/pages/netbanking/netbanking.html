@@ -5,6 +5,8 @@
       <p class="welcome-text">Welcome back, {{ userName() }}!</p>
     </header>
     
+    <app-welcome-banner />
+    
     <div class="dashboard-grid">
       <app-card 
         [clickable]="true"
@@ -220,14 +222,14 @@
                 id="toAccount"
                 type="text" 
                 formControlName="toAccountNumber"
-                placeholder="Enter 10-14 digit account number"
+                placeholder="Enter account number (6-20 alphanumeric characters)"
                 [class.is-invalid]="hasError('toAccountNumber', 'required') || hasError('toAccountNumber', 'pattern')"
               >
               @if (hasError('toAccountNumber', 'required')) {
                 <span class="error-message">Account number is required</span>
               }
               @if (hasError('toAccountNumber', 'pattern')) {
-                <span class="error-message">Account number must be 10-14 digits</span>
+                <span class="error-message">Account number must be 6-20 alphanumeric characters</span>
               }
             </div>
             

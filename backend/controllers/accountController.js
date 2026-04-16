@@ -1,14 +1,12 @@
-const neo4j = require('neo4j-driver');
-const { driver } = require('../config/neo4j');
+const { withSession, toNumber } = require('../config/neo4j');
 
-const withSession = async (callback) => {
-  const session = driver.session();
-  try {
-    return await callback(session);
-  } finally {
-    await session.close();
-  }
-};
+const ACCOUNT_TYPES = Object.freeze({
+  SAVINGS: 'SAVINGS',
+  CURRENT: 'CURRENT',
+  FIXED: 'FIXED'
+});
+
+const VALID_ACCOUNT_TYPES = Object.values(ACCOUNT_TYPES);
 
 const getAccounts = async (req, res) => {
   try {
@@ -24,9 +22,7 @@ const getAccounts = async (req, res) => {
       id: r.get('a').properties.id,
       accountNumber: r.get('a').properties.accountNumber,
       accountType: r.get('a').properties.accountType,
-      balance: neo4j.isInt(r.get('a').properties.balance)
-        ? r.get('a').properties.balance.toNumber()
-        : r.get('a').properties.balance
+      balance: toNumber(r.get('a').properties.balance)
     }));
 
     res.json({ accounts });
@@ -40,7 +36,7 @@ const createAccount = async (req, res) => {
   try {
     const { accountType, initialDeposit } = req.body;
 
-    if (!['SAVINGS', 'CURRENT', 'FIXED'].includes(accountType)) {
+    if (!VALID_ACCOUNT_TYPES.includes(accountType)) {
       return res.status(400).json({ error: 'Invalid account type' });
     }
 
@@ -73,7 +69,7 @@ const createAccount = async (req, res) => {
         id: account.id,
         accountNumber: account.accountNumber,
         accountType: account.accountType,
-        balance: neo4j.isInt(account.balance) ? account.balance.toNumber() : account.balance
+        balance: toNumber(account.balance)
       }
     });
   } catch (error) {
@@ -100,29 +96,38 @@ const getAccountStatement = async (req, res) => {
       dateFilter = 'AND t.timestamp <= datetime($to)';
     }
 
-    const accountResult = await withSession(session =>
-      session.run(
-        `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
-         RETURN a`,
-        { userId: req.user.userId, accountId: id }
-      )
-    );
+    const result = await withSession(async (session) => {
+      return await session.executeRead(async (tx) => {
+        const accountResult = await tx.run(
+          `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})
+           RETURN a`,
+          { userId: req.user.userId, accountId: id }
+        );
 
-    if (accountResult.records.length === 0) {
-      return res.status(403).json({ error: 'Forbidden' });
+        if (accountResult.records.length === 0) {
+          return { accessDenied: true };
+        }
+
+        const transactionsResult = await tx.run(
+          `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
+           WHERE true ${dateFilter}
+           RETURN t ORDER BY t.timestamp DESC`,
+          { userId: req.user.userId, accountId: id, from, to }
+        );
+
+        return {
+          account: accountResult.records[0].get('a'),
+          transactions: transactionsResult.records
+        };
+      });
+    });
+
+    if (result.accessDenied) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
-    const result = await withSession(session =>
-      session.run(
-        `MATCH (u:User {id: $userId})-[:HAS_ACCOUNT]->(a:Account {id: $accountId})-[:SENT|:RECEIVED]->(t:Transaction)
-         WHERE true ${dateFilter}
-         RETURN t ORDER BY t.timestamp DESC`,
-        { userId: req.user.userId, accountId: id, from, to }
-      )
-    );
-
-    const account = accountResult.records[0].get('a').properties;
-    const transactions = result.records.map(r => {
+    const account = result.account.properties;
+    const transactions = result.transactions.map(r => {
       const props = r.get('t').properties;
       let timestamp = props.timestamp;
       if (timestamp && typeof timestamp === 'object') {
@@ -131,10 +136,20 @@ const getAccountStatement = async (req, res) => {
       }
       return {
         id: props.id,
-        amount: neo4j.isInt(props.amount) ? props.amount.toNumber() : props.amount,
+        amount: toNumber(props.amount),
         description: props.description,
         timestamp
       };
+    });
+
+    let totalCredits = 0;
+    let totalDebits = 0;
+    transactions.forEach(t => {
+      if (t.amount > 0) {
+        totalCredits += t.amount;
+      } else {
+        totalDebits += Math.abs(t.amount);
+      }
     });
 
     if (format === 'csv') {
@@ -148,15 +163,15 @@ const getAccountStatement = async (req, res) => {
       res.send(csvHeader + csvRows);
     } else {
       res.json({
-        statement: {
-          accountId: id,
-          accountNumber: account.accountNumber,
-          accountType: account.accountType,
-          fromDate: from,
-          toDate: to,
-          generatedAt: new Date().toISOString(),
-          transactions
-        }
+        accountId: id,
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        fromDate: from,
+        toDate: to,
+        generatedAt: new Date().toISOString(),
+        totalCredits,
+        totalDebits,
+        transactions
       });
     }
   } catch (error) {
@@ -165,4 +180,4 @@ const getAccountStatement = async (req, res) => {
   }
 };
 
-module.exports = { getAccounts, createAccount, getAccountStatement };
+module.exports = { getAccounts, createAccount, getAccountStatement, ACCOUNT_TYPES };

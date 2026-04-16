@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Netbanking Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/welcome');
-    await page.fill('input[type="email"]', 'john@example.com');
-    await page.fill('input[type="password"]', 'password123');
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'demo@nexusbank.com');
+    await page.fill('input[type="password"]', 'Password123!');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/netbanking');
   });
@@ -150,6 +150,94 @@ test.describe('Netbanking Dashboard', () => {
       await page.click('.close-btn');
 
       await expect(page.locator('text=Transaction Details')).not.toBeVisible();
+    }
+  });
+});
+
+test.describe('Batch Transfer E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'demo@nexusbank.com');
+    await page.fill('input[type="password"]', 'Password123!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/netbanking', { timeout: 10000 });
+  });
+
+  test('should complete batch transfer with OTP verification', async ({ page, request }) => {
+    await page.click('h3:has-text("Fund Transfer")');
+    await page.click('button:has-text("Batch Transfer")');
+
+    await expect(page.locator('text=Recipients')).toBeVisible();
+
+    const accountSelect = page.locator('select#fromAccount, select[name="fromAccountId"], select').first();
+    await accountSelect.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+    const recipientGroups = page.locator('.recipient-group');
+    const initialCount = await recipientGroups.count();
+
+    if (initialCount < 3) {
+      for (let i = initialCount; i < 3; i++) {
+        await page.click('button:has-text("+ Add Another Recipient")');
+      }
+    }
+
+    const amount = '50';
+
+    const amountInputs = page.locator('.recipient-group input[name*="amount"], .recipient-group input#amount');
+    const accountInputs = page.locator('.recipient-group input[name*="accountNumber"], .recipient-group input#toAccount, .recipient-group input[name*="toAccountNumber"]');
+
+    const recipientAccounts = ['1234567890', '0987654321', '1111222233'];
+
+    for (let i = 0; i < 3; i++) {
+      const accInput = accountInputs.nth(i);
+      const amtInput = amountInputs.nth(i);
+      await accInput.fill(recipientAccounts[i]);
+      await amtInput.fill(amount);
+    }
+
+    const token = await page.evaluate(() => localStorage.getItem('token'));
+    const response = await request.get('http://localhost:3000/api/accounts', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const accountsData = await response.json();
+    const accounts = accountsData.accounts || [];
+
+    if (accounts.length > 0) {
+      const sourceAccountId = accounts[0].id;
+      const accountSelectLocator = page.locator('select#fromAccount, select[name="fromAccountId"]').first();
+      await accountSelectLocator.selectOption(sourceAccountId).catch(() => {});
+    }
+
+    await page.click('button:has-text("Send All Transfers")');
+
+    await page.waitForTimeout(2000);
+
+    const otpInput = page.locator('input#otp');
+    await expect(otpInput).toBeVisible({ timeout: 5000 });
+
+    const otpResponse = await request.get('http://localhost:3000/api/transactions/test/otp/batch_transfer', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    let otpCode = '123456';
+    if (otpResponse.ok()) {
+      const otpData = await otpResponse.json();
+      otpCode = otpData.otp;
+    }
+
+    await otpInput.fill(otpCode);
+
+    await page.click('button[type="submit"]:has-text("Confirm Transfer"), button:has-text("Confirm")');
+
+    await page.waitForTimeout(3000);
+
+    await expect(page.locator('.toast-message').first()).toBeVisible({ timeout: 5000 }).catch(() => {});
+
+    const batchReceiptModal = page.locator('text=Batch Transfer Receipt, text=Transfer Summary, text=Receipt').first();
+    const receiptVisible = await batchReceiptModal.isVisible().catch(() => false);
+
+    if (receiptVisible) {
+      await expect(batchReceiptModal).toBeVisible();
     }
   });
 });

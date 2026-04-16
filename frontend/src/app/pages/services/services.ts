@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-services',
@@ -7,6 +8,11 @@ import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Services {
+  constructor(private router: Router) {}
+
+  openAccount() {
+    this.router.navigate(['/netbanking']);
+  }
   services = signal([
     {
       icon: '💳',

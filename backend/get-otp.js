@@ -24,8 +24,8 @@ async function main() {
       return;
     }
     const props = otpResult.records[0].get('o').properties;
-    console.log('OTP:', props.otp);
     console.log('OTPId:', props.otpId);
+    console.log('Note: OTP is hashed and cannot be retrieved for security reasons');
   } finally {
     await session.close();
     driver.close();

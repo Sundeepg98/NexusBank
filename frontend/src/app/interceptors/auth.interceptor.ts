@@ -4,6 +4,7 @@ import { AuthService } from '../services/auth';
 import { catchError, switchMap, filter, take, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 
+// Module-level flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 
 export const authInterceptor: HttpInterceptorFn = (
@@ -43,7 +44,7 @@ export const authInterceptor: HttpInterceptorFn = (
           if (!authService.isRefreshTokenValid()) {
             isRefreshing = false;
             authService.logout();
-            router.navigate(['/welcome']);
+            router.navigate(['/login']);
             return throwError(() => new Error('Session expired'));
           }
 
@@ -61,7 +62,7 @@ export const authInterceptor: HttpInterceptorFn = (
             catchError((refreshError) => {
               isRefreshing = false;
               authService.logout();
-              router.navigate(['/welcome']);
+              router.navigate(['/login']);
               return throwError(() => new Error(refreshError.error?.error || 'Session expired'));
             })
           );

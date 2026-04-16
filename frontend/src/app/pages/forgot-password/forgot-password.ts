@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
 import { ApiService } from '../../services/api';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
@@ -13,9 +14,10 @@ type Step = 'email' | 'otp' | 'password' | 'success';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink, ToastComponent, LoadingComponent],
   templateUrl: './forgot-password.html',
-  styleUrl: './forgot-password.scss'
+  styleUrl: './forgot-password.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ForgotPassword {
+export class ForgotPassword implements OnDestroy {
   emailForm: FormGroup;
   otpForm: FormGroup;
   passwordForm: FormGroup;
@@ -26,6 +28,7 @@ export class ForgotPassword {
   showToast = signal(false);
   otpId = signal('');
   email = signal('');
+  protected destroy$ = new Subject<void>();
 
   constructor(
     private fb: FormBuilder,
@@ -56,18 +59,20 @@ export class ForgotPassword {
     const emailValue = this.emailForm.value.email;
     this.email.set(emailValue);
 
-    this.apiService.forgotPassword(emailValue).subscribe({
-      next: (response) => {
-        this.otpId.set(response.otpId);
-        this.currentStep.set('otp');
-        this.isLoading.set(false);
-        this.showToastMessage('OTP sent to your email', 'success');
-      },
-      error: (err: Error) => {
-        this.isLoading.set(false);
-        this.showToastMessage(err.message || 'Failed to send OTP', 'error');
-      }
-    });
+    this.apiService.forgotPassword(emailValue)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.otpId.set(response.otpId);
+          this.currentStep.set('otp');
+          this.isLoading.set(false);
+          this.showToastMessage('OTP sent to your email', 'success');
+        },
+        error: (err: Error) => {
+          this.isLoading.set(false);
+          this.showToastMessage(err.message || 'Failed to send OTP', 'error');
+        }
+      });
   }
 
   onSubmitOtp(): void {
@@ -76,10 +81,6 @@ export class ForgotPassword {
       return;
     }
 
-    this.currentStep.set('password');
-  }
-
-  onSubmitPassword(): void {
     if (this.passwordForm.invalid) {
       this.passwordForm.markAllAsTouched();
       return;
@@ -99,28 +100,32 @@ export class ForgotPassword {
 
     this.isLoading.set(true);
 
-    this.apiService.resetPassword(this.email(), this.otpId(), this.otpForm.value.otp, newPassword).subscribe({
-      next: () => {
-        this.currentStep.set('success');
-        this.isLoading.set(false);
-      },
-      error: (err: Error) => {
-        this.isLoading.set(false);
-        this.showToastMessage(err.message || 'Failed to reset password', 'error');
-      }
-    });
+    this.apiService.resetPassword(this.email(), this.otpId(), this.otpForm.value.otp, newPassword)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.currentStep.set('success');
+          this.isLoading.set(false);
+        },
+        error: (err: Error) => {
+          this.isLoading.set(false);
+          this.showToastMessage(err.message || 'Failed to verify OTP or reset password', 'error');
+        }
+      });
+  }
+
+  onSubmitPassword(): void {
+    this.onSubmitOtp();
   }
 
   goBack(): void {
     if (this.currentStep() === 'otp') {
       this.currentStep.set('email');
-    } else if (this.currentStep() === 'password') {
-      this.currentStep.set('otp');
     }
   }
 
   goToLogin(): void {
-    this.router.navigate(['/welcome']);
+    this.router.navigate(['/login']);
   }
 
   private showToastMessage(message: string, type: 'success' | 'error' | 'warning'): void {
@@ -140,5 +145,10 @@ export class ForgotPassword {
   hasError(form: FormGroup, field: string, errorCode: string): boolean {
     const control = form.get(field);
     return !!(control?.touched && control?.hasError(errorCode));
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

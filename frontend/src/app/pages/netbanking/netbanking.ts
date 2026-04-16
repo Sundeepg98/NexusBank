@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, computed, ViewChild, ElementRef, AfterViewInit, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, HostListener, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -6,19 +6,22 @@ import { trigger, state, style, transition, animate } from '@angular/animations'
 import { Subject, takeUntil } from 'rxjs';
 import { ApiService } from '../../services/api';
 import { AuthService } from '../../services/auth';
+import { StatementService } from '../../services/statement.service';
 import { Account, Transaction, LoadingState } from '../../models';
 import { ToastComponent } from '../../components/toast';
 import { LoadingComponent } from '../../components/loading';
 import { CardComponent } from '../../components/card';
+import { WelcomeBannerComponent } from '../../components/welcome-banner/welcome-banner';
 import { CurrencyPipe } from '../../pipes/currency.pipe';
 import { DateFormatPipe } from '../../pipes/date-format.pipe';
 
 @Component({
   selector: 'app-netbanking',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent, CardComponent, CurrencyPipe, DateFormatPipe],
+  imports: [CommonModule, ReactiveFormsModule, ToastComponent, LoadingComponent, CardComponent, CurrencyPipe, DateFormatPipe, WelcomeBannerComponent],
   templateUrl: './netbanking.html',
   styleUrl: './netbanking.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [
     trigger('fadeIn', [
       state('void', style({ opacity: 0, transform: 'translateY(-10px)' })),
@@ -41,12 +44,7 @@ import { DateFormatPipe } from '../../pipes/date-format.pipe';
     ])
   ]
 })
-export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild('accountList') accountList!: ElementRef<HTMLDivElement>;
-  
-  // Example of @ViewChild usage - accessing child component
-  @ViewChild(CardComponent) cardComponent!: CardComponent;
-  
+export class Netbanking implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private sessionCheckInterval: any;
 
@@ -55,6 +53,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   transactions = signal<Transaction[]>([]);
   loadState = signal<LoadingState>('idle');
   transferState = signal<LoadingState>('idle');
+
+  // Statement filters
+  statementFromDate = signal<string>('');
+  statementToDate = signal<string>('');
+  totalCredits = signal<number>(0);
+  totalDebits = signal<number>(0);
   
   // UI state
   showAccounts = signal(false);
@@ -100,6 +104,14 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     timestamp: string;
   } | null>(null);
 
+  // Batch Receipt state
+  showBatchReceipt = signal(false);
+  lastBatchTransaction = signal<{
+    fromAccount: string;
+    transfers: { txnId: string; toAccountNumber: string; amount: number }[];
+    timestamp: string;
+  } | null>(null);
+
   // Forms
   transferForm!: FormGroup;
   batchTransferForm!: FormGroup;
@@ -118,13 +130,11 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     private fb: FormBuilder,
     private apiService: ApiService,
     private authService: AuthService,
+    private statementService: StatementService,
     private router: Router,
     private route: ActivatedRoute
   ) {
     this.initTransferForm();
-  }
-
-  ngAfterViewInit(): void {
   }
 
   ngOnInit(): void {
@@ -142,7 +152,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
     this.sessionCheckInterval = setInterval(() => {
       if (!this.authService.checkSession()) {
-        this.router.navigate(['/welcome']);
+        this.router.navigate(['/login']);
       }
     }, 60000);
   }
@@ -240,12 +250,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     })
     .pipe(takeUntil(this.destroy$))
     .subscribe({
-      next: (response) => {
-        this.otpId.set(response.otpId);
-        this.startOTPCountdown(30);
-        this.otpState.set('idle');
-        this.showToastMessage(`OTP resent! Check your phone/email for the code.`, 'success');
-      },
+        next: (response) => {
+          this.otpId.set(response.otpId);
+          this.startOTPCountdown(30);
+          this.otpState.set('idle');
+          this.showToastMessage(response.otp ? `OTP is: ${response.otp}` : `OTP resent! Check your phone/email for the code.`, 'success', 30000);
+        },
       error: (err: Error) => {
         this.otpState.set('error');
         this.showToastMessage(err.message || 'Failed to resend OTP', 'error');
@@ -266,12 +276,12 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     })
     .pipe(takeUntil(this.destroy$))
     .subscribe({
-      next: (response) => {
-        this.batchOTPId.set(response.otpId);
-        this.startBatchOTPCountdown(30);
-        this.batchOTPState.set('idle');
-        this.showToastMessage(`OTP resent! Check your phone/email for the code.`, 'success');
-      },
+        next: (response) => {
+          this.batchOTPId.set(response.otpId);
+          this.startBatchOTPCountdown(30);
+          this.batchOTPState.set('idle');
+          this.showToastMessage(response.otp ? `OTP is: ${response.otp}` : `OTP resent! Check your phone/email for the code.`, 'success', 30000);
+        },
       error: (err: Error) => {
         this.batchOTPState.set('error');
         this.showToastMessage(err.message || 'Failed to resend OTP', 'error');
@@ -314,7 +324,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
   private createRecipientGroup(): import('@angular/forms').AbstractControl {
     return this.fb.group({
-      toAccountNumber: ['', [Validators.required, Validators.pattern(/^\d{10,14}$/)]],
+      toAccountNumber: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9-]{6,20}$/)]],
       amount: [null, [Validators.required, Validators.min(1), Validators.max(1000000)]],
       description: [''],
     });
@@ -423,7 +433,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.batchOTPId.set(response.otpId);
           this.showBatchOTPInput.set(true);
           this.startBatchOTPCountdown(30);
-          this.showToastMessage(`OTP sent for batch transfer! Check your phone/email for the code.`, 'success');
+          this.showToastMessage(response.otp ? `OTP is: ${response.otp}` : `OTP sent for batch transfer! Check your phone/email for the code.`, 'success', 30000);
         },
         error: (err: Error) => {
           this.transferState.set('error');
@@ -500,24 +510,57 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
     this.showTransactions.set(!this.showTransactions());
     this.showAccounts.set(false);
     this.showTransfer.set(false);
-    
+
     if (this.showTransactions()) {
-      const account = this.selectedAccount();
-      if (account) {
-        this.loadState.set('loading');
-        this.apiService.getTransactions(account.id)
-          .pipe(takeUntil(this.destroy$))
-          .subscribe({
-            next: (txns: Transaction[]) => {
-              this.transactions.set(txns);
-              this.loadState.set('success');
-            },
-        error: (err: Error) => {
-              this.loadState.set('error');
-              this.showToastMessage(err.message || 'Failed to load transactions', 'error');
-            },
-          });
-      }
+      this.loadStatementTransactions();
+    }
+  }
+
+  loadStatementTransactions(): void {
+    const account = this.selectedAccount();
+    if (!account) return;
+
+    this.loadState.set('loading');
+    const from = this.statementFromDate();
+    const to = this.statementToDate();
+
+    if (from && to) {
+      this.statementService.getStatement(account.id, from, to)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (statement) => {
+            this.transactions.set(statement.transactions);
+            this.totalCredits.set(statement.totalCredits);
+            this.totalDebits.set(statement.totalDebits);
+            this.loadState.set('success');
+          },
+          error: (err: Error) => {
+            this.loadState.set('error');
+            this.showToastMessage(err.message || 'Failed to load statement', 'error');
+          },
+        });
+    } else {
+      this.apiService.getTransactions(account.id)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (txns: Transaction[]) => {
+            this.transactions.set(txns);
+            const totals = this.statementService.calculateTotals(txns);
+            this.totalCredits.set(totals.credits);
+            this.totalDebits.set(totals.debits);
+            this.loadState.set('success');
+          },
+          error: (err: Error) => {
+            this.loadState.set('error');
+            this.showToastMessage(err.message || 'Failed to load transactions', 'error');
+          },
+        });
+    }
+  }
+
+  filterStatementByDate(): void {
+    if (this.statementFromDate() && this.statementToDate()) {
+      this.loadStatementTransactions();
     }
   }
 
@@ -543,7 +586,7 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
           this.otpId.set(response.otpId);
           this.showOTPInput.set(true);
           this.startOTPCountdown(response.expiresIn);
-          this.showToastMessage('OTP sent! Check your phone/email for the code.', 'success');
+          this.showToastMessage(response.otp ? `OTP is: ${response.otp}` : 'OTP sent! Check your phone/email for the code.', 'success', 30000);
         },
         error: (err: Error) => {
           this.transferState.set('error');
@@ -632,17 +675,17 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/welcome']);
+    this.router.navigate(['/login']);
   }
 
-  private showToastMessage(message: string, type: 'success' | 'error' | 'warning'): void {
+  private showToastMessage(message: string, type: 'success' | 'error' | 'warning', duration?: number): void {
     this.toastMessage.set(message);
     this.toastType.set(type);
     this.showToast.set(true);
-    
+
     setTimeout(() => {
       this.showToast.set(false);
-    }, 5000);
+    }, duration ?? 5000);
   }
 
   closeToast(): void {
@@ -665,6 +708,11 @@ export class Netbanking implements OnInit, AfterViewInit, OnDestroy {
   closeReceipt(): void {
     this.showReceipt.set(false);
     this.lastTransaction.set(null);
+  }
+
+  closeBatchReceipt(): void {
+    this.showBatchReceipt.set(false);
+    this.lastBatchTransaction.set(null);
   }
 
   downloadReceipt(): void {

@@ -67,26 +67,6 @@ describe('StatementService', () => {
     expect(csv).toBe('');
   });
 
-  it('should filter transactions by date range', () => {
-    const startDate = new Date('2024-01-01');
-    const endDate = new Date('2024-01-31');
-    
-    const filtered = service.filterByDateRange(mockTransactions, startDate, endDate);
-    
-    expect(filtered).toHaveLength(2);
-    expect(filtered[0].id).toBe('1');
-    expect(filtered[1].id).toBe('2');
-  });
-
-  it('should return empty array when no transactions in range', () => {
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
-    
-    const filtered = service.filterByDateRange(mockTransactions, startDate, endDate);
-    
-    expect(filtered).toHaveLength(0);
-  });
-
   it('should calculate totals correctly', () => {
     const totals = service.calculateTotals(mockTransactions);
     

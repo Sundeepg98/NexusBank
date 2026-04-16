@@ -71,11 +71,11 @@
               type="text"
               [value]="formAccountNumber()"
               (input)="formAccountNumber.set($any($event.target).value); validateForm()"
-              placeholder="Enter 10-14 digit account number"
+              placeholder="Enter account number (6-20 alphanumeric characters)"
               [disabled]="showEditModal()"
             >
-            @if (formAccountNumber() && !/^\d{10,14}$/.test(formAccountNumber())) {
-              <span class="error-text">Account number must be 10-14 digits</span>
+            @if (formAccountNumber() && !/^[A-Za-z0-9-]{6,20}$/.test(formAccountNumber())) {
+              <span class="error-text">Account number must be 6-20 alphanumeric characters</span>
             }
           </div>
 

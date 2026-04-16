@@ -1,8 +1,8 @@
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth';
 
-export const loginGuard: CanActivateFn = (route, state) => {
+export const loginGuard: CanActivateFn = (_route, _state): true | UrlTree => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
@@ -10,6 +10,5 @@ export const loginGuard: CanActivateFn = (route, state) => {
     return true;
   }
 
-  router.navigate(['/netbanking']);
-  return false;
+  return router.createUrlTree(['/netbanking']);
 };

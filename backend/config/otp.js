@@ -1,36 +1,23 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { withSession } = require('./neo4j');
-const logger = require('./logger')?.logger;
+const { sendOTPNotification } = require('./notificationService');
+const logger = require('./logger');
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 
+const OTP_PURPOSE = Object.freeze({
+  TRANSFER: 'transfer',
+  BATCH_TRANSFER: 'batch_transfer',
+  PASSWORD_CHANGE: 'password_change',
+  FORGOT_PASSWORD: 'forgot_password',
+  GENERAL: 'general'
+});
+
 const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
-
-const sendOTPNotification = (otp, channel = 'mock', metadata = {}) => {
-  const otpLog = `[OTP] ${otp} | ${metadata.purpose || 'general'} | ${metadata.email || metadata.userId || 'unknown'}`;
-  if (logger?.info) {
-    logger.info(otpLog);
-  } else {
-    console.log(otpLog);
-  }
-};
-
-const cleanupExpiredOTPs = async () => {
-  const now = Date.now().toString();
-  await withSession(session =>
-    session.run(
-      'MATCH (o:OTPEntry) WHERE o.expiresAt < $now DELETE o',
-      { now }
-    )
-  );
-};
-
-if (process.env.NODE_ENV !== 'test') {
-  setInterval(cleanupExpiredOTPs, 5 * 60 * 1000);
-}
 
 const checkLockout = async (otpId) => {
   const result = await withSession(session =>
@@ -60,26 +47,21 @@ const recordFailedAttempt = async (otpId) => {
   return lockout.attempts;
 };
 
-const clearFailedAttempts = async (otpId) => {
-  await withSession(session =>
-    session.run(
-      'MATCH (o:OTPEntry {otpId: $otpId}) SET o.failedAttempts = 0',
-      { otpId }
-    )
-  );
-};
-
 const createOtpEntry = async (data) => {
   const otp = generateOTP();
   const otpId = crypto.randomUUID();
   const expiresAt = Date.now() + OTP_EXPIRY_MS;
+  const hashedOtp = await bcrypt.hash(otp, 10);
+
+  const isTest = process.env.NODE_ENV === 'test' && process.env.ENABLE_TEST_OTP === 'true';
+  const plainOtpField = isTest ? ', plainOtp: $plainOtp' : '';
 
   await withSession(session =>
     session.run(
       `CREATE (o:OTPEntry {
         id: randomUUID(),
         otpId: $otpId,
-        otp: $otp,
+        otp: $hashedOtp${plainOtpField},
         expiresAt: $expiresAt,
         createdAt: $createdAt,
         userId: $userId,
@@ -90,18 +72,23 @@ const createOtpEntry = async (data) => {
       RETURN o`,
       {
         otpId,
-        otp,
+        hashedOtp,
         expiresAt,
         createdAt: Date.now(),
         userId: data.userId || '',
         purpose: data.purpose || 'general',
-        transferData: JSON.stringify(data.transferData || null)
+        transferData: JSON.stringify(data.transferData || null),
+        ...(isTest ? { plainOtp: otp } : {})
       }
     )
   );
 
-  sendOTPNotification(otp, 'mock', { purpose: data.purpose, email: data.email, userId: data.userId });
-  return { otpId, otp, expiresAt };
+  sendOTPNotification('mock', { purpose: data.purpose, email: data.email, userId: data.userId });
+
+  if (isTest) {
+    return { otpId, expiresAt, otp };
+  }
+  return { otpId, expiresAt };
 };
 
 const verifyOtpEntry = async (otpId, otp) => {
@@ -130,7 +117,8 @@ const verifyOtpEntry = async (otpId, otp) => {
     return { valid: false, reason: 'expired' };
   }
 
-  if (stored.otp !== otp) {
+  const otpMatch = await bcrypt.compare(otp, stored.otp);
+  if (!otpMatch) {
     const attempts = await recordFailedAttempt(otpId);
     if (attempts >= MAX_ATTEMPTS) {
       await withSession(session =>
@@ -141,19 +129,20 @@ const verifyOtpEntry = async (otpId, otp) => {
     return { valid: false, reason: 'invalid', attempts };
   }
 
-  const transferData = stored.transferData ? JSON.parse(stored.transferData) : null;
+  let transferData = null;
+  if (stored.transferData) {
+    try {
+      transferData = JSON.parse(stored.transferData);
+    } catch (e) {
+      logger.error('Failed to parse transferData', { stored });
+    }
+  }
 
   await withSession(session =>
     session.run('MATCH (o:OTPEntry {otpId: $otpId}) DELETE o', { otpId })
   );
 
-  return { valid: true, data: { ...stored, transferData } };
-};
-
-const deleteOtpEntry = async (otpId) => {
-  await withSession(session =>
-    session.run('MATCH (o:OTPEntry {otpId: $otpId}) DELETE o', { otpId })
-  );
+  return { valid: true, data: { userId: stored.userId, purpose: stored.purpose, transferData } };
 };
 
 module.exports = {
@@ -162,7 +151,5 @@ module.exports = {
   verifyOtpEntry,
   checkLockout,
   recordFailedAttempt,
-  clearFailedAttempts,
-  deleteOtpEntry,
-  cleanupExpiredOTPs
+  OTP_PURPOSE
 };

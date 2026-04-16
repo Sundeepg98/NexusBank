@@ -16,7 +16,7 @@ async function seed() {
         id: randomUUID(),
         username: 'demo',
         email: 'demo@nexusbank.com',
-        password: '$2a$10$wmrZkLQyhGRR5V/zh2a34OBsWI1lsu9i4lWfUxMyCVlWfw20khjwq',
+        password: '$2a$10$0W.uShxBl/fdD/MIP8DY6.Gy/sL2LD1eeEEfwztO6jbcRvPdDB7zi',
         firstName: 'Demo',
         lastName: 'User',
         phone: '1234567890',
@@ -49,7 +49,7 @@ async function seed() {
         id: randomUUID(),
         username: 'alice',
         email: 'alice@nexusbank.com',
-        password: '$2a$10$wmrZkLQyhGRR5V/zh2a34OBsWI1lsu9i4lWfUxMyCVlWfw20khjwq',
+        password: '$2a$10$0W.uShxBl/fdD/MIP8DY6.Gy/sL2LD1eeEEfwztO6jbcRvPdDB7zi',
         firstName: 'Alice',
         lastName: 'Smith',
         phone: '9876543210',
@@ -84,8 +84,8 @@ async function seed() {
     
     console.log('\n✓ Database seeded successfully!');
     console.log('\nDemo accounts:');
-    console.log('  - Account 1: 123456789012 (Demo User) - Balance: 50000');
-    console.log('  - Account 2: 987654321098 (Alice Smith) - Balance: 25000');
+    console.log('  - demo@nexusbank.com / Password123! (Demo User) - Account: 123456789012 - Balance: 50000');
+    console.log('  - alice@nexusbank.com / Password123! (Alice Smith) - Account: 987654321098 - Balance: 25000');
     
   } catch (e) {
     console.log('✗ Error:', e.message);

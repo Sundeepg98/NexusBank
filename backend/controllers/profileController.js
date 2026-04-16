@@ -1,8 +1,7 @@
 const bcrypt = require('bcryptjs');
-const neo4j = require('neo4j-driver');
 const { withSession } = require('../config/neo4j');
-const { createOtpEntry, verifyOtpEntry } = require('../config/otp');
-const { validatePassword } = require('../routes/auth');
+const { createOtpEntry, verifyOtpEntry, OTP_PURPOSE } = require('../config/otp');
+const { validatePassword } = require('../utils/passwordValidator');
 
 const getProfile = async (req, res) => {
   try {
@@ -79,17 +78,9 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const hasUpperCase = /[A-Z]/.test(newPassword);
-    const hasLowerCase = /[a-z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.message });
     }
 
     if (currentPassword === newPassword) {
@@ -128,17 +119,9 @@ const requestPasswordChangeOTP = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const hasUpperCase = /[A-Z]/.test(newPassword);
-    const hasLowerCase = /[a-z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-      return res.status(400).json({ error: 'Password must contain uppercase, lowercase, number, and special character' });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.message });
     }
 
     const result = await withSession(session =>
@@ -157,7 +140,7 @@ const requestPasswordChangeOTP = async (req, res) => {
     }
 
     const { otpId } = await createOtpEntry({
-      purpose: 'password_change',
+      purpose: OTP_PURPOSE.PASSWORD_CHANGE,
       userId: req.user.userId
     });
 
@@ -178,7 +161,7 @@ const changePasswordWithOTP = async (req, res) => {
 
     const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return res.status(400).json({ error: passwordValidation.error });
+      return res.status(400).json({ error: passwordValidation.message });
     }
 
     const verification = await verifyOtpEntry(otpId, otp);
@@ -187,7 +170,7 @@ const changePasswordWithOTP = async (req, res) => {
       return res.status(400).json({ error: `OTP ${verification.reason}` });
     }
 
-    if (verification.data.purpose !== 'password_change') {
+    if (verification.data.purpose !== OTP_PURPOSE.PASSWORD_CHANGE) {
       return res.status(400).json({ error: 'Invalid OTP purpose' });
     }
 

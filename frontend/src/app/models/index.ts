@@ -54,10 +54,3 @@ export interface ApiError {
 }
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
-
-export interface FormFieldState {
-  touched: boolean;
-  dirty: boolean;
-  invalid: boolean;
-  errors: Record<string, string>;
-}

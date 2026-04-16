@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { withSession } = require('../config/neo4j');
 
+if (!process.env.JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is not set');
+}
+
 const blacklistToken = async (token) => {
   const decoded = jwt.decode(token);
   if (!decoded || !decoded.exp) return;
@@ -81,13 +85,11 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-setInterval(cleanupExpiredTokens, 60 * 60 * 1000);
-
 module.exports = { 
   authMiddleware, 
   blacklistToken, 
   blacklistRefreshToken, 
   isRefreshTokenBlacklisted,
   isTokenBlacklisted,
-  cleanupExpiredTokens 
+  cleanupExpiredTokens
 };
