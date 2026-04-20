@@ -2,16 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Authentication', () => {
   test('should display login page', async ({ page }) => {
-    await page.goto('/welcome');
+    await page.goto('/login');
     
-    await expect(page.locator('h1')).toContainText('Welcome to NexusBank');
+    await expect(page.locator('h1')).toContainText('Login');
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toContainText('Login');
   });
 
   test('should show validation errors for empty login form', async ({ page }) => {
-    await page.goto('/welcome');
+    await page.goto('/login');
     
     const loginButton = page.locator('button[type="submit"]');
     await expect(loginButton).toBeDisabled();
@@ -23,9 +23,9 @@ test.describe('Authentication', () => {
   });
 
   test('should navigate to registration page', async ({ page }) => {
-    await page.goto('/welcome');
+    await page.goto('/login');
     
-    await page.click('text=Create one');
+    await page.click('text=Register');
     await expect(page).toHaveURL(/\/register/);
     await expect(page.locator('h1')).toContainText('Create Account');
   });

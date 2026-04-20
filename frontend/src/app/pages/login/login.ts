@@ -51,9 +51,7 @@ export class Login implements OnDestroy {
         this.authService.login(response.token, response.user, response.refreshToken, response.refreshTokenExpiry);
         this.isLoading.set(false);
         this.showToastMessage('Login successful!', 'success');
-        setTimeout(() => {
-          this.router.navigate(['/netbanking']);
-        }, 1500);
+this.router.navigate(['/netbanking']);  // Navigate immediately
       },
       error: (err: Error) => {
         this.isLoading.set(false);

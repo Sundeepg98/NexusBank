@@ -152,6 +152,28 @@ All notable changes to NexusBank project.
 - **Token storage working** - Auth token properly stored and retrieved
 - **Dashboard loads correctly** - Account info, quick actions all displayed
 
+### Security Fixes (2026-04-16)
+- Fixed rate limiter bypass vulnerability - all limiters now use email as key instead of IP-email combo to prevent bypass when email is missing
+- Fixed forgotPasswordLimiter and contactLimiter missing test mode bypass (max now 1000 in test mode)
+- Fixed rate limiter IPv6 validation error - simplified keyGenerator to use email-only key
+
+### Bug Fixes (2026-04-16)
+- Fixed OTP not displayed in toast - createOtpEntry returns otp in test mode but controller was discarding it
+- Fixed JSON.parse without try-catch in otp.js
+- Fixed string vs number type coercion in transfer verification
+- Fixed test OTP endpoint bug (req.params vs req.body)
+- Added ENABLE_TEST_OTP documentation to .env.example
+
+### New Features (2026-04-16)
+- Created test OTP controller (controllers/testOtpController.js)
+- Created test OTP route (routes/testOtp.js) - GET /api/test/:purpose
+- Added test:e2e npm script to frontend
+- Consolidated E2E test directories into e2e/tests/
+- Created forgot password E2E test
+
+### UX Improvements (2026-04-16)
+- Fixed OTP toast to stay visible for 30 seconds instead of 5 seconds
+
 ## [1.0.2] - 2026-04-14
 
 ### Added
